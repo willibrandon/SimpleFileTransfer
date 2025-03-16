@@ -6,14 +6,22 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace SimpleFileTransfer;
 
-class Program
+public class Program
 {
-    const int Port = 9876;
+    public const int Port = 9876;
+    private static string _downloadsDir = Path.Combine(Environment.CurrentDirectory, "downloads");
+
+    public static string DownloadsDirectory
+    {
+        get => _downloadsDir;
+        set => _downloadsDir = value ?? throw new ArgumentNullException(nameof(value));
+    }
     
-    static void Main(string[] args)
+    public static void Main(string[] args)
     {
         if (args.Length == 0)
         {
@@ -25,7 +33,7 @@ class Program
 
         if (args[0] == "receive")
         {
-            RunServer();
+            RunServer(CancellationToken.None);
         }
         else if (args[0] == "send" && args.Length == 3)
         {
@@ -45,7 +53,7 @@ class Program
         }
     }
 
-    static string CalculateHash(string filepath)
+    public static string CalculateHash(string filepath)
     {
         using var sha256 = SHA256.Create();
         using var stream = File.OpenRead(filepath);
@@ -53,14 +61,14 @@ class Program
         return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
     }
 
-    static void DisplayProgress(long current, long total, long bytesPerSecond)
+    public static void DisplayProgress(long current, long total, long bytesPerSecond)
     {
         var percentage = current * 100 / total;
         var mbps = bytesPerSecond / 1024.0 / 1024.0;
         Console.Write($"\rProgress: {current:N0}/{total:N0} bytes ({percentage}%) - {mbps:F2} MB/s");
     }
 
-    static void SendDirectory(string host, string dirPath)
+    public static void SendDirectory(string host, string dirPath)
     {
         var files = Directory.GetFiles(dirPath, "*", SearchOption.AllDirectories);
         var dirInfo = new DirectoryInfo(dirPath);
@@ -135,7 +143,7 @@ class Program
         }
     }
 
-    static void RunServer()
+    public static void RunServer(CancellationToken cancellationToken = default)
     {
         var listener = new TcpListener(IPAddress.Any, Port);
         listener.Start();
@@ -153,32 +161,45 @@ class Program
         }
         Console.WriteLine("Ctrl+C to exit");
         
-        while (true)
+        try
         {
-            var client = listener.AcceptTcpClient();
-            Console.WriteLine($"\nClient connected from {client.Client.RemoteEndPoint}");
-            
-            using var stream = client.GetStream();
-            using var reader = new BinaryReader(stream);
-            
-            // Read first string to determine if it's a directory
-            var firstString = reader.ReadString();
-            
-            if (firstString.StartsWith("DIR:"))
+            while (!cancellationToken.IsCancellationRequested)
             {
-                ReceiveDirectory(reader, stream);
+                if (!listener.Pending())
+                {
+                    Thread.Sleep(100);  // Don't busy-wait
+                    continue;
+                }
+
+                var client = listener.AcceptTcpClient();
+                Console.WriteLine($"\nClient connected from {client.Client.RemoteEndPoint}");
+                
+                using var stream = client.GetStream();
+                using var reader = new BinaryReader(stream);
+                
+                // Read first string to determine if it's a directory
+                var firstString = reader.ReadString();
+                
+                if (firstString.StartsWith("DIR:"))
+                {
+                    ReceiveDirectory(reader, stream);
+                }
+                else
+                {
+                    // It's a single file transfer, firstString is the filename
+                    ReceiveFile(reader, stream, firstString);
+                }
+                
+                client.Close();
             }
-            else
-            {
-                // It's a single file transfer, firstString is the filename
-                ReceiveFile(reader, stream, firstString);
-            }
-            
-            client.Close();
+        }
+        finally
+        {
+            listener.Stop();
         }
     }
 
-    static void ReceiveDirectory(BinaryReader reader, NetworkStream stream)
+    public static void ReceiveDirectory(BinaryReader reader, NetworkStream stream)
     {
         // Read base directory name
         var dirName = reader.ReadString();
@@ -189,7 +210,7 @@ class Program
         Console.WriteLine($"Total files: {fileCount}");
         
         // Create downloads directory in current working directory
-        var downloadsDir = Path.Combine(Environment.CurrentDirectory, "downloads", dirName);
+        var downloadsDir = Path.Combine(DownloadsDirectory, dirName);
         Directory.CreateDirectory(downloadsDir);
         
         for (var i = 0; i < fileCount; i++)
@@ -259,7 +280,7 @@ class Program
         Console.WriteLine("\nDirectory received successfully");
     }
 
-    static void ReceiveFile(BinaryReader reader, NetworkStream stream, string filename)
+    public static void ReceiveFile(BinaryReader reader, NetworkStream stream, string filename)
     {
         // Read filesize
         var filesize = reader.ReadInt64();
@@ -267,11 +288,10 @@ class Program
         var sourceHash = reader.ReadString();
         
         // Create downloads directory in current working directory
-        var downloadsDir = Path.Combine(Environment.CurrentDirectory, "downloads");
-        Directory.CreateDirectory(downloadsDir);
+        Directory.CreateDirectory(DownloadsDirectory);
         
         // Create full save path
-        var savePath = Path.Combine(downloadsDir, filename);
+        var savePath = Path.Combine(DownloadsDirectory, filename);
         Console.WriteLine($"Receiving file: {filename} ({filesize:N0} bytes)");
         Console.WriteLine($"Saving to: {savePath}");
         
@@ -324,12 +344,11 @@ class Program
         }
     }
 
-    static void SendFile(string host, string filepath)
+    public static void SendFile(string host, string filepath)
     {
         if (!File.Exists(filepath))
         {
-            Console.WriteLine($"File not found: {filepath}");
-            return;
+            throw new FileNotFoundException($"File not found: {filepath}", filepath);
         }
         
         var fileInfo = new FileInfo(filepath);
