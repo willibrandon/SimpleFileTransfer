@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 
 namespace SimpleFileTransfer;
@@ -77,15 +79,23 @@ public class Program
         else if (args[0] == "send" && args.Length >= 3)
         {
             var host = args[1];
-            var path = args[2];
+            var paths = new List<string>();
             var useCompression = false;
             var compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip;
             var useEncryption = false;
             var password = string.Empty;
             var resumeEnabled = false;
             
+            // Collect all paths before options
+            int i = 2;
+            while (i < args.Length && !args[i].StartsWith("--"))
+            {
+                paths.Add(args[i]);
+                i++;
+            }
+            
             // Parse options
-            for (int i = 3; i < args.Length; i++)
+            for (; i < args.Length; i++)
             {
                 if (args[i] == "--compress" || args[i] == "--gzip")
                 {
@@ -119,17 +129,60 @@ public class Program
                     password,
                     resumeEnabled);
                 
-                if (Directory.Exists(path))
+                if (paths.Count == 1)
                 {
-                    client.SendDirectory(path);
-                }
-                else if (File.Exists(path))
-                {
-                    client.SendFile(path);
+                    var path = paths[0];
+                    if (Directory.Exists(path))
+                    {
+                        client.SendDirectory(path);
+                    }
+                    else if (File.Exists(path))
+                    {
+                        client.SendFile(path);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Error: Path not found: {path}");
+                    }
                 }
                 else
                 {
-                    Console.WriteLine($"Error: Path not found: {path}");
+                    // Multiple files mode
+                    var validFiles = new List<string>();
+                    var invalidPaths = new List<string>();
+                    
+                    foreach (var path in paths)
+                    {
+                        if (File.Exists(path))
+                        {
+                            validFiles.Add(path);
+                        }
+                        else if (Directory.Exists(path))
+                        {
+                            Console.WriteLine($"Warning: {path} is a directory. Use a single directory path to send directories.");
+                            invalidPaths.Add(path);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Warning: Path not found: {path}");
+                            invalidPaths.Add(path);
+                        }
+                    }
+                    
+                    if (invalidPaths.Count != 0)
+                    {
+                        Console.WriteLine($"Found {invalidPaths.Count} invalid paths. Continuing with valid files only.");
+                    }
+                    
+                    if (validFiles.Count != 0)
+                    {
+                        Console.WriteLine($"Sending {validFiles.Count} files to {host}");
+                        client.SendMultipleFiles(validFiles);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Error: No valid files to send.");
+                    }
                 }
             }
             catch (Exception ex)
@@ -190,28 +243,30 @@ public class Program
         Console.WriteLine("SimpleFileTransfer - A simple file transfer utility");
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  receive [options]                - Start receiving files");
-        Console.WriteLine("  send <host> <path> [options]     - Send a file or directory");
-        Console.WriteLine("  list-resume                      - List all incomplete transfers that can be resumed");
-        Console.WriteLine("  resume <index> [options]         - Resume an incomplete transfer");
+        Console.WriteLine("  receive [options]                      - Start receiving files");
+        Console.WriteLine("  send <host> <path> [options]           - Send a file or directory");
+        Console.WriteLine("  send <host> <path1> <path2>... [options] - Send multiple files");
+        Console.WriteLine("  list-resume                            - List all incomplete transfers that can be resumed");
+        Console.WriteLine("  resume <index> [options]               - Resume an incomplete transfer");
         Console.WriteLine();
         Console.WriteLine("Options for receive:");
-        Console.WriteLine("  --password <password>            - Password for decrypting files");
+        Console.WriteLine("  --password <password>                  - Password for decrypting files");
         Console.WriteLine();
         Console.WriteLine("Options for send:");
-        Console.WriteLine("  --compress                       - Use GZip compression");
-        Console.WriteLine("  --gzip                           - Use GZip compression");
-        Console.WriteLine("  --brotli                         - Use Brotli compression");
-        Console.WriteLine("  --encrypt <password>             - Encrypt data with the specified password");
-        Console.WriteLine("  --resume                         - Enable resume capability for interrupted transfers");
+        Console.WriteLine("  --compress                             - Use GZip compression");
+        Console.WriteLine("  --gzip                                 - Use GZip compression");
+        Console.WriteLine("  --brotli                               - Use Brotli compression");
+        Console.WriteLine("  --encrypt <password>                   - Encrypt data with the specified password");
+        Console.WriteLine("  --resume                               - Enable resume capability for interrupted transfers");
         Console.WriteLine();
         Console.WriteLine("Options for resume:");
-        Console.WriteLine("  --password <password>            - Password for encryption (if the transfer is encrypted)");
+        Console.WriteLine("  --password <password>                  - Password for encryption (if the transfer is encrypted)");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  SimpleFileTransfer receive");
         Console.WriteLine("  SimpleFileTransfer receive --password mysecretpassword");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 file1.txt file2.txt file3.txt");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --compress");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --resume");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfolder --brotli");

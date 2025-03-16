@@ -109,19 +109,10 @@ public class FileTransferTests : IDisposable
         return dirPath;
     }
 
-    private string CalculateHash(string content)
+    private static string CalculateHash(string content)
     {
-        using var sha256 = SHA256.Create();
-        var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(content));
-        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-    }
-
-    private string CalculateFileHash(string filepath)
-    {
-        using var sha256 = SHA256.Create();
-        using var stream = File.OpenRead(filepath);
-        var hash = sha256.ComputeHash(stream);
-        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(content));
+        return Convert.ToHexStringLower(hash);
     }
 
     [Fact]
@@ -417,47 +408,137 @@ public class FileTransferTests : IDisposable
             Host = "localhost",
             Port = 9876,
             RelativePath = "",
-            DirectoryName = ""
+            DirectoryName = "",
+            IsMultiFile = false
         };
         
         try
         {
-            // Act - Create a resume file
+            // Act
             TransferResumeManager.CreateResumeFile(resumeInfo);
+            var loaded = TransferResumeManager.LoadResumeInfo(testFilePath);
             
-            // Assert - Verify the resume file was created
-            var loadedInfo = TransferResumeManager.LoadResumeInfo(testFilePath);
-            Assert.NotNull(loadedInfo);
-            Assert.Equal(resumeInfo.FileName, loadedInfo.FileName);
-            Assert.Equal(resumeInfo.TotalSize, loadedInfo.TotalSize);
-            Assert.Equal(resumeInfo.BytesTransferred, loadedInfo.BytesTransferred);
+            // Assert
+            Assert.NotNull(loaded);
+            Assert.Equal(testFilePath, loaded!.FilePath);
+            Assert.Equal(Path.GetFileName(testFilePath), loaded.FileName);
+            Assert.Equal(100, loaded.TotalSize);
+            Assert.Equal(50, loaded.BytesTransferred);
+            Assert.Equal("testhash", loaded.Hash);
+            Assert.True(loaded.UseCompression);
+            Assert.Equal(CompressionHelper.CompressionAlgorithm.GZip, loaded.CompressionAlgorithm);
+            Assert.True(loaded.UseEncryption);
+            Assert.Equal("localhost", loaded.Host);
+            Assert.Equal(9876, loaded.Port);
+            Assert.Equal("", loaded.RelativePath);
+            Assert.Equal("", loaded.DirectoryName);
+            Assert.False(loaded.IsMultiFile);
             
-            // Act - Update the resume file
-            resumeInfo.BytesTransferred = 75;
-            TransferResumeManager.UpdateResumeFile(resumeInfo);
+            // Update
+            loaded.BytesTransferred = 75;
+            TransferResumeManager.UpdateResumeFile(loaded);
             
-            // Assert - Verify the resume file was updated
-            loadedInfo = TransferResumeManager.LoadResumeInfo(testFilePath);
-            Assert.NotNull(loadedInfo);
-            Assert.Equal(75, loadedInfo.BytesTransferred);
+            var updated = TransferResumeManager.LoadResumeInfo(testFilePath);
+            Assert.NotNull(updated);
+            Assert.Equal(75, updated!.BytesTransferred);
             
-            // Act - Get all resume files
-            var allResumeFiles = TransferResumeManager.GetAllResumeFiles();
-            
-            // Assert - Verify our resume file is in the list
-            Assert.Contains(allResumeFiles, r => r.FilePath == testFilePath);
-            
-            // Act - Delete the resume file
+            // Delete
             TransferResumeManager.DeleteResumeFile(testFilePath);
-            
-            // Assert - Verify the resume file was deleted
-            loadedInfo = TransferResumeManager.LoadResumeInfo(testFilePath);
-            Assert.Null(loadedInfo);
+            var deleted = TransferResumeManager.LoadResumeInfo(testFilePath);
+            Assert.Null(deleted);
         }
         finally
         {
-            // Cleanup
-            TransferResumeManager.DeleteResumeFile(testFilePath);
+            if (File.Exists(testFilePath))
+            {
+                File.Delete(testFilePath);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task MultipleFilesTransfer_Success()
+    {
+        // Arrange
+        var port = await StartServer();
+        var file1 = CreateTestFile("multi_test1.txt", "Test content 1");
+        var file2 = CreateTestFile("multi_test2.txt", "Test content 2");
+        var file3 = CreateTestFile("multi_test3.txt", "Test content 3");
+        
+        var files = new List<string> { file1, file2, file3 };
+        
+        // Act
+        var client = new FileTransferClient("localhost", port);
+        client.SendMultipleFiles(files);
+        await Task.Delay(3000); // Give more time for transfer to complete
+        
+        // Assert
+        foreach (var file in files)
+        {
+            var filename = Path.GetFileName(file);
+            var downloadedPath = Path.Combine(_downloadDir, filename);
+            Assert.True(File.Exists(downloadedPath), $"File {filename} was not downloaded");
+            Assert.Equal(File.ReadAllText(file), File.ReadAllText(downloadedPath));
+        }
+    }
+    
+    [Fact]
+    public async Task MultipleFilesTransfer_WithCompression_Success()
+    {
+        // Arrange
+        var port = await StartServer();
+        var file1 = CreateTestFile("multi_comp_test1.txt", "Test content with compression 1");
+        var file2 = CreateTestFile("multi_comp_test2.txt", "Test content with compression 2");
+        var file3 = CreateTestFile("multi_comp_test3.txt", "Test content with compression 3");
+        
+        var files = new List<string> { file1, file2, file3 };
+        
+        // Act
+        var client = new FileTransferClient(
+            "localhost", 
+            port, 
+            useCompression: true, 
+            compressionAlgorithm: CompressionHelper.CompressionAlgorithm.GZip);
+        client.SendMultipleFiles(files);
+        await Task.Delay(3000); // Give more time for transfer to complete
+        
+        // Assert
+        foreach (var file in files)
+        {
+            var filename = Path.GetFileName(file);
+            var downloadedPath = Path.Combine(_downloadDir, filename);
+            Assert.True(File.Exists(downloadedPath), $"File {filename} was not downloaded");
+            Assert.Equal(File.ReadAllText(file), File.ReadAllText(downloadedPath));
+        }
+    }
+    
+    [Fact]
+    public async Task MultipleFilesTransfer_WithEncryption_Success()
+    {
+        // Arrange
+        var port = await StartServer(TestPassword);
+        var file1 = CreateTestFile("multi_enc_test1.txt", "Test content with encryption 1");
+        var file2 = CreateTestFile("multi_enc_test2.txt", "Test content with encryption 2");
+        var file3 = CreateTestFile("multi_enc_test3.txt", "Test content with encryption 3");
+        
+        var files = new List<string> { file1, file2, file3 };
+        
+        // Act
+        var client = new FileTransferClient(
+            "localhost", 
+            port, 
+            useEncryption: true, 
+            password: TestPassword);
+        client.SendMultipleFiles(files);
+        await Task.Delay(3000); // Give more time for transfer to complete
+        
+        // Assert
+        foreach (var file in files)
+        {
+            var filename = Path.GetFileName(file);
+            var downloadedPath = Path.Combine(_downloadDir, filename);
+            Assert.True(File.Exists(downloadedPath), $"File {filename} was not downloaded");
+            Assert.Equal(File.ReadAllText(file), File.ReadAllText(downloadedPath));
         }
     }
 }

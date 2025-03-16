@@ -19,7 +19,7 @@ public static class FileOperations
         using var sha256 = SHA256.Create();
         using var stream = File.OpenRead(filepath);
         var hash = sha256.ComputeHash(stream);
-        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+        return Convert.ToHexStringLower(hash);
     }
 
     /// <summary>

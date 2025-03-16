@@ -298,7 +298,7 @@ public class FileTransferClient
                     TransferResumeManager.DeleteResumeFile(filepath);
                 }
             }
-            catch (IOException ex)
+            catch (IOException)
             {
                 if (_resumeEnabled && resumeInfo != null)
                 {
@@ -640,7 +640,7 @@ public class FileTransferClient
                         TransferResumeManager.DeleteResumeFile(file);
                     }
                 }
-                catch (IOException ex)
+                catch (IOException)
                 {
                     if (_resumeEnabled && resumeInfo != null)
                     {
@@ -702,9 +702,53 @@ public class FileTransferClient
         Console.WriteLine($"Found {resumeFiles.Count} incomplete transfers:");
         Console.WriteLine();
         
+        // Group multi-file transfers
+        var multiFileGroups = resumeFiles
+            .Where(r => r.IsMultiFile)
+            .GroupBy(r => new { r.Host, r.Port })
+            .ToList();
+        
+        // Process multi-file transfers first
+        foreach (var group in multiFileGroups)
+        {
+            var firstFile = group.First();
+            var validFiles = group.Where(r => File.Exists(r.FilePath)).ToList();
+            var totalSize = validFiles.Sum(r => r.TotalSize);
+            var totalTransferred = validFiles.Sum(r => r.BytesTransferred);
+            var progress = totalSize > 0 ? (double)totalTransferred / totalSize * 100 : 0;
+            
+            // Find the index of the first file in the group
+            var index = resumeFiles.IndexOf(firstFile) + 1;
+            
+            Console.WriteLine($"{index}. Multi-file transfer ({validFiles.Count} files, {totalSize:N0} bytes)");
+            Console.WriteLine($"   Progress: {progress:F2}% ({totalTransferred:N0} of {totalSize:N0} bytes)");
+            Console.WriteLine($"   Host: {firstFile.Host}:{firstFile.Port}");
+            Console.WriteLine($"   Compression: {(firstFile.UseCompression ? $"Enabled ({firstFile.CompressionAlgorithm})" : "Disabled")}");
+            Console.WriteLine($"   Encryption: {(firstFile.UseEncryption ? "Enabled" : "Disabled")}");
+            Console.WriteLine($"   Last updated: {firstFile.Timestamp}");
+            Console.WriteLine();
+            
+            // Skip individual listing of these files
+            foreach (var file in group)
+            {
+                resumeFiles.Remove(file);
+            }
+            
+            // Add back just the first one to maintain the index
+            resumeFiles.Insert(index - 1, firstFile);
+        }
+        
+        // Process remaining files
         for (int i = 0; i < resumeFiles.Count; i++)
         {
             var info = resumeFiles[i];
+            
+            // Skip if this is a multi-file transfer (already processed)
+            if (info.IsMultiFile)
+            {
+                continue;
+            }
+            
             var progress = (double)info.BytesTransferred / info.TotalSize * 100;
             
             Console.WriteLine($"{i + 1}. {info.FileName} ({info.TotalSize:N0} bytes)");
@@ -768,12 +812,7 @@ public class FileTransferClient
             password,
             true);
         
-        if (string.IsNullOrEmpty(info.DirectoryName))
-        {
-            // Single file transfer
-            client.SendFile(info.FilePath);
-        }
-        else
+        if (!string.IsNullOrEmpty(info.DirectoryName))
         {
             // Part of a directory transfer
             // For simplicity, we'll just send the entire directory again
@@ -787,6 +826,345 @@ public class FileTransferClient
             {
                 Console.WriteLine($"The directory containing {info.FilePath} no longer exists. Cannot resume transfer.");
             }
+        }
+        else if (info.IsMultiFile)
+        {
+            // Part of a multi-file transfer
+            // Find all files that are part of the same multi-file transfer
+            var multiFileTransfers = resumeFiles
+                .Where(r => r.IsMultiFile && r.Host == info.Host && r.Port == info.Port)
+                .ToList();
+            
+            // Filter out files that no longer exist
+            var validFiles = multiFileTransfers
+                .Where(r => File.Exists(r.FilePath))
+                .Select(r => r.FilePath)
+                .ToList();
+            
+            if (validFiles.Count == 0)
+            {
+                Console.WriteLine("No valid files found for this multi-file transfer. Cannot resume.");
+                return;
+            }
+            
+            Console.WriteLine($"Resuming multi-file transfer with {validFiles.Count} files");
+            client.SendMultipleFiles(validFiles);
+        }
+        else
+        {
+            // Single file transfer
+            client.SendFile(info.FilePath);
+        }
+    }
+
+    /// <summary>
+    /// Sends multiple files to the server.
+    /// </summary>
+    /// <param name="filePaths">A list of file paths to send.</param>
+    /// <exception cref="ArgumentException">Thrown when the list of file paths is empty.</exception>
+    public void SendMultipleFiles(List<string> filePaths)
+    {
+        if (filePaths == null || filePaths.Count == 0)
+        {
+            throw new ArgumentException("No files to send.", nameof(filePaths));
+        }
+        
+        var totalSize = filePaths.Sum(f => new FileInfo(f).Length);
+        Console.WriteLine($"Sending {filePaths.Count} files ({totalSize:N0} bytes) to {_host}");
+        Console.WriteLine($"Compression: {(_useCompression ? $"Enabled ({_compressionAlgorithm})" : "Disabled")}");
+        Console.WriteLine($"Encryption: {(_useEncryption ? "Enabled" : "Disabled")}");
+        Console.WriteLine($"Resume capability: {(_resumeEnabled ? "Enabled" : "Disabled")}");
+        
+        try
+        {
+            using var client = new TcpClient();
+            client.Connect(_host, _port);
+            using var stream = client.GetStream();
+            using var writer = new BinaryWriter(stream);
+            
+            // Send marker indicating this is a multi-file transfer
+            writer.Write("MULTI:");
+            // Send compression flag
+            writer.Write(_useCompression);
+            // Send encryption flag
+            writer.Write(_useEncryption);
+            // Send resume flag
+            writer.Write(_resumeEnabled);
+            
+            if (_useCompression)
+            {
+                // Send compression algorithm
+                writer.Write((int)_compressionAlgorithm);
+            }
+            
+            // Send number of files
+            writer.Write(filePaths.Count);
+            
+            foreach (var (filePath, index) in filePaths.Select((f, i) => (f, i)))
+            {
+                var fileInfo = new FileInfo(filePath);
+                
+                Console.WriteLine($"\nSending file {index + 1}/{filePaths.Count}: {fileInfo.Name}");
+                
+                // Calculate hash before sending
+                Console.Write("Calculating file hash... ");
+                var hash = FileOperations.CalculateHash(filePath);
+                Console.WriteLine("done");
+                
+                // Check for resume information
+                TransferResumeManager.ResumeInfo? resumeInfo = null;
+                long resumePosition = 0;
+                
+                if (_resumeEnabled)
+                {
+                    resumeInfo = TransferResumeManager.LoadResumeInfo(filePath);
+                    if (resumeInfo != null)
+                    {
+                        // Verify that the resume info matches the current transfer parameters
+                        if (resumeInfo.Hash == hash && 
+                            resumeInfo.UseCompression == _useCompression &&
+                            resumeInfo.UseEncryption == _useEncryption &&
+                            resumeInfo.Host == _host &&
+                            resumeInfo.Port == _port &&
+                            (!_useCompression || resumeInfo.CompressionAlgorithm == _compressionAlgorithm))
+                        {
+                            resumePosition = resumeInfo.BytesTransferred;
+                            Console.WriteLine($"Resuming transfer from position {resumePosition:N0} bytes ({(double)resumePosition * 100 / fileInfo.Length:F2}%)");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Resume information found but parameters don't match. Starting a new transfer.");
+                            resumeInfo = null;
+                        }
+                    }
+                }
+                
+                // If no valid resume info, create a new one
+                if (_resumeEnabled && resumeInfo == null)
+                {
+                    resumeInfo = new TransferResumeManager.ResumeInfo
+                    {
+                        FilePath = filePath,
+                        FileName = Path.GetFileName(filePath),
+                        TotalSize = fileInfo.Length,
+                        BytesTransferred = 0,
+                        Hash = hash,
+                        UseCompression = _useCompression,
+                        CompressionAlgorithm = _compressionAlgorithm,
+                        UseEncryption = _useEncryption,
+                        Host = _host,
+                        Port = _port,
+                        IsMultiFile = true
+                    };
+                    
+                    TransferResumeManager.CreateResumeFile(resumeInfo);
+                }
+                
+                // Send filename
+                writer.Write(Path.GetFileName(filePath));
+                // Send original filesize
+                writer.Write(fileInfo.Length);
+                // Send hash
+                writer.Write(hash);
+                // Send resume position
+                writer.Write(resumePosition);
+                
+                // Keep track of temporary files to clean up at the end
+                var tempFiles = new List<string>();
+                
+                try
+                {
+                    // Send file data
+                    using var fileStream = File.OpenRead(filePath);
+                    
+                    // Create a temporary file for processed data
+                    var tempFile = Path.GetTempFileName();
+                    tempFiles.Add(tempFile);
+                    
+                    // Process the file (compression and/or encryption)
+                    using (var processedFileStream = File.Create(tempFile))
+                    {
+                        var sourceStream = fileStream;
+                        
+                        // Apply compression if enabled
+                        if (_useCompression)
+                        {
+                            Console.WriteLine($"Compressing data using {_compressionAlgorithm}...");
+                            
+                            var compressedTempFile = Path.GetTempFileName();
+                            tempFiles.Add(compressedTempFile);
+                            
+                            try
+                            {
+                                using (var compressedFileStream = File.Create(compressedTempFile))
+                                {
+                                    CompressionHelper.Compress(sourceStream, compressedFileStream, _compressionAlgorithm);
+                                }
+                                
+                                // Close the original source stream before opening the new one
+                                if (sourceStream != fileStream)
+                                {
+                                    sourceStream.Dispose();
+                                }
+                                
+                                sourceStream = File.OpenRead(compressedTempFile);
+                            }
+                            finally
+                            {
+                                // We'll clean up this file later, after sourceStream is closed
+                                // Don't delete it here as it might still be in use by sourceStream
+                            }
+                        }
+                        
+                        // Apply encryption if enabled
+                        if (_useEncryption)
+                        {
+                            Console.WriteLine("Encrypting data...");
+                            EncryptionHelper.Encrypt(sourceStream, processedFileStream, _password!);
+                            
+                            // Close the source stream if it's not the original file stream
+                            if (sourceStream != fileStream)
+                            {
+                                sourceStream.Dispose();
+                            }
+                        }
+                        else
+                        {
+                            // Just copy the data if no encryption
+                            sourceStream.CopyTo(processedFileStream);
+                            
+                            // Close the source stream if it's not the original file stream
+                            if (sourceStream != fileStream)
+                            {
+                                sourceStream.Dispose();
+                            }
+                        }
+                    }
+                    
+                    // Get processed size
+                    var processedInfo = new FileInfo(tempFile);
+                    var processedSize = processedInfo.Length;
+                    
+                    if (_useCompression)
+                    {
+                        var ratio = CompressionHelper.GetCompressionRatio(fileInfo.Length, processedSize);
+                        Console.WriteLine($"Processed size: {processedSize:N0} bytes ({ratio:F2}% reduction)");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Processed size: {processedSize:N0} bytes");
+                    }
+                    
+                    // Send processed size
+                    writer.Write(processedSize);
+                    
+                    // Calculate resume position in processed file
+                    long processedResumePosition = 0;
+                    if (resumePosition > 0)
+                    {
+                        // For simplicity, we use a proportional approach to estimate the position in the processed file
+                        processedResumePosition = (long)(processedSize * ((double)resumePosition / fileInfo.Length));
+                        Console.WriteLine($"Resuming from approximately {processedResumePosition:N0} bytes in the processed file");
+                    }
+                    
+                    // Send processed resume position
+                    writer.Write(processedResumePosition);
+                    
+                    // Send processed data
+                    using var processedDataStream = File.OpenRead(tempFile);
+                    
+                    // Skip to the resume position if resuming
+                    if (processedResumePosition > 0)
+                    {
+                        processedDataStream.Seek(processedResumePosition, SeekOrigin.Begin);
+                    }
+                    
+                    var buffer = new byte[8192];
+                    var bytesRead = processedResumePosition;
+                    var sw = Stopwatch.StartNew();
+                    var lastUpdate = sw.ElapsedMilliseconds;
+                    var lastBytes = bytesRead;
+                    int read;
+                    
+                    try
+                    {
+                        while ((read = processedDataStream.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            stream.Write(buffer, 0, read);
+                            bytesRead += read;
+                            
+                            var now = sw.ElapsedMilliseconds;
+                            if (now - lastUpdate >= 100)
+                            {
+                                var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                                FileOperations.DisplayProgress(bytesRead, processedSize, bytesPerSecond);
+                                lastUpdate = now;
+                                lastBytes = bytesRead;
+                                
+                                // Update resume info every second
+                                if (_resumeEnabled && resumeInfo != null && now - resumeInfo.Timestamp.ToUniversalTime().Ticks / 10000 >= 1000)
+                                {
+                                    // Calculate original file position based on processed position
+                                    var originalPosition = (long)(fileInfo.Length * ((double)bytesRead / processedSize));
+                                    resumeInfo.BytesTransferred = originalPosition;
+                                    TransferResumeManager.UpdateResumeFile(resumeInfo);
+                                }
+                            }
+                        }
+                        
+                        Console.WriteLine();
+                        Console.WriteLine($"File {index + 1}/{filePaths.Count} sent successfully");
+                        
+                        // Delete resume file if transfer was successful
+                        if (_resumeEnabled && resumeInfo != null)
+                        {
+                            TransferResumeManager.DeleteResumeFile(filePath);
+                        }
+                    }
+                    catch (IOException)
+                    {
+                        if (_resumeEnabled && resumeInfo != null)
+                        {
+                            // Calculate original file position based on processed position
+                            var originalPosition = (long)(fileInfo.Length * ((double)bytesRead / processedSize));
+                            resumeInfo.BytesTransferred = originalPosition;
+                            TransferResumeManager.UpdateResumeFile(resumeInfo);
+                            
+                            Console.WriteLine($"\nTransfer interrupted at {originalPosition:N0} bytes ({(double)originalPosition * 100 / fileInfo.Length:F2}%)");
+                            Console.WriteLine("You can resume this transfer later using the 'resume' command.");
+                            return;
+                        }
+                        
+                        throw;
+                    }
+                }
+                finally
+                {
+                    // Clean up all temporary files
+                    foreach (var tempFile in tempFiles)
+                    {
+                        try
+                        {
+                            if (File.Exists(tempFile))
+                            {
+                                File.Delete(tempFile);
+                            }
+                        }
+                        catch (IOException)
+                        {
+                            // Ignore file access errors during cleanup
+                            Console.WriteLine($"Note: Could not delete temporary file {tempFile}. It will be cleaned up later.");
+                        }
+                    }
+                }
+            }
+            
+            Console.WriteLine("\nAll files sent successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+            throw;
         }
     }
 }

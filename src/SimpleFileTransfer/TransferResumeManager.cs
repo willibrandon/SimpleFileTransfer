@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace SimpleFileTransfer;
@@ -14,6 +15,9 @@ public static class TransferResumeManager
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "SimpleFileTransfer",
         "Resume");
+        
+    // Create a static JsonSerializerOptions instance to be reused
+    private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
     /// <summary>
     /// Contains information about a file transfer that can be resumed.
@@ -81,6 +85,11 @@ public static class TransferResumeManager
         public string DirectoryName { get; set; } = string.Empty;
         
         /// <summary>
+        /// Whether this file is part of a multi-file transfer.
+        /// </summary>
+        public bool IsMultiFile { get; set; }
+        
+        /// <summary>
         /// The timestamp when this resume info was last updated.
         /// </summary>
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
@@ -99,7 +108,7 @@ public static class TransferResumeManager
     public static void CreateResumeFile(ResumeInfo info)
     {
         info.Timestamp = DateTime.UtcNow;
-        var json = JsonSerializer.Serialize(info, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(info, _jsonOptions);
         File.WriteAllText(GetResumeFilePath(info.FilePath), json);
     }
 
@@ -110,7 +119,7 @@ public static class TransferResumeManager
     public static void UpdateResumeFile(ResumeInfo info)
     {
         info.Timestamp = DateTime.UtcNow;
-        var json = JsonSerializer.Serialize(info, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(info, _jsonOptions);
         File.WriteAllText(GetResumeFilePath(info.FilePath), json);
     }
 
@@ -192,8 +201,7 @@ public static class TransferResumeManager
     {
         // Create a unique filename based on the file path
         var hash = Convert.ToBase64String(
-            System.Security.Cryptography.SHA256.Create().ComputeHash(
-                System.Text.Encoding.UTF8.GetBytes(filePath)))
+            SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(filePath)))
             .Replace("/", "_")
             .Replace("+", "-")
             .Replace("=", "");
