@@ -11,6 +11,8 @@ public class FileTransferTests : IDisposable
     private CancellationTokenSource? _serverCts;
     private const string TestPassword = "testpassword123";
     private static int _portCounter = 9876;
+    private StringWriter? _consoleWriter;
+    private TextWriter? _originalConsole;
 
     public FileTransferTests()
     {
@@ -26,6 +28,23 @@ public class FileTransferTests : IDisposable
     {
         _serverCts?.Cancel();
         _serverTask?.Wait();
+        
+        // Restore original console output
+        if (_originalConsole != null)
+        {
+            try
+            {
+                Console.SetOut(_originalConsole);
+            }
+            catch (Exception)
+            {
+                // Ignore any errors during cleanup
+            }
+        }
+        
+        // Dispose the console writer
+        _consoleWriter?.Dispose();
+        
         Directory.Delete(_testDir, true);
         GC.SuppressFinalize(this);
     }
@@ -36,13 +55,14 @@ public class FileTransferTests : IDisposable
         int port = Interlocked.Increment(ref _portCounter);
         
         _serverCts = new CancellationTokenSource();
+        
+        // Create StringWriter outside the task so it won't be disposed while the server is running
+        var writer = new StringWriter();
+        var originalOut = Console.Out;
+        Console.SetOut(writer);
+        
         _serverTask = Task.Run(() =>
         {
-            // Redirect console output to StringWriter to avoid polluting test output
-            var originalOut = Console.Out;
-            using var writer = new StringWriter();
-            Console.SetOut(writer);
-
             try
             {
                 var server = new FileTransferServer(_downloadDir, port, password, _serverCts.Token);
@@ -52,15 +72,25 @@ public class FileTransferTests : IDisposable
             {
                 // Expected when we cancel the server
             }
-            finally
+            catch (Exception ex)
             {
-                Console.SetOut(originalOut);
+                // Log any unexpected exceptions
+                try
+                {
+                    Console.WriteLine($"Server error: {ex.Message}");
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Ignore if console is already disposed
+                }
             }
         });
 
-        // Give the server a moment to start
-        await Task.Delay(100);
+        // Store the writer and original console for cleanup in Dispose
+        _consoleWriter = writer;
+        _originalConsole = originalOut;
         
+        await Task.Delay(1000); // Give time for server to start
         return port;
     }
 

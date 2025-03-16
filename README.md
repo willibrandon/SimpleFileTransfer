@@ -10,6 +10,34 @@ Make sure you have .NET 9.0 SDK installed, then run:
 dotnet build
 ```
 
+## Docker Support
+
+The project includes Docker support for both the application and tests.
+
+### Building and Running with Docker
+
+```bash
+# Build the Docker image
+docker-compose build
+
+# Run the application in Docker
+docker-compose up simplefiletransfer
+```
+
+### Running Tests in Docker
+
+```bash
+# Build and run the tests in Docker
+docker-compose build simplefiletransfer.tests
+docker run --rm simplefiletransfertests:latest
+```
+
+Alternatively, use the provided PowerShell script:
+
+```powershell
+.\run-tests-in-docker.ps1
+```
+
 ## Usage
 
 ### Receiving Files (Server Mode)
@@ -158,6 +186,7 @@ dotnet run queue-clear     # Clear all transfers from the queue
 - Resume capability for interrupted transfers
 - Transfer queue for sequential processing
 - Hash verification to ensure data integrity
+- Docker support for both application and tests
 
 ## Notes
 

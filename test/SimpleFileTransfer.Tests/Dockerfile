@@ -16,7 +16,9 @@ RUN dotnet restore "./test/SimpleFileTransfer.Tests/SimpleFileTransfer.Tests.csp
 COPY . .
 WORKDIR "/src/test/SimpleFileTransfer.Tests"
 RUN dotnet build "./SimpleFileTransfer.Tests.csproj" -c $BUILD_CONFIGURATION -o /app/build
-RUN dotnet test "./SimpleFileTransfer.Tests.csproj" -c $BUILD_CONFIGURATION --logger "console;verbosity=detailed"
+
+# Skip running tests during build to make the build process faster
+# Tests will be run when the container is executed
 
 # This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
@@ -24,7 +26,8 @@ ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./SimpleFileTransfer.Tests.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "SimpleFileTransfer.Tests.dll"]
+# Change the entrypoint to run tests with detailed output
+ENTRYPOINT ["dotnet", "test", "SimpleFileTransfer.Tests.dll", "--logger", "console;verbosity=detailed"]

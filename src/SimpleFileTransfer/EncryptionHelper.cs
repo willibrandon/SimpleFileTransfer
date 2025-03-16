@@ -87,13 +87,25 @@ public static class EncryptionHelper
         catch (CryptographicException)
         {
             // Decryption failed, likely due to wrong password
-            Console.WriteLine("Decryption failed. The password may be incorrect.");
+            SafeConsoleWrite("Decryption failed. The password may be incorrect.");
             return false;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error during decryption: {ex.Message}");
+            SafeConsoleWrite($"Error during decryption: {ex.Message}");
             return false;
+        }
+    }
+    
+    private static void SafeConsoleWrite(string message)
+    {
+        try
+        {
+            Console.WriteLine(message);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Ignore exception when console is closed
         }
     }
 }
