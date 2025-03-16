@@ -1,5 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Xunit;
 
 namespace SimpleFileTransfer.Tests;
 
@@ -40,7 +46,8 @@ public class FileTransferTests : IDisposable
 
             try
             {
-                Program.RunServer(_serverCts.Token);
+                var server = new FileTransferServer(_downloadDir);
+                server.Start(_serverCts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -98,7 +105,8 @@ public class FileTransferTests : IDisposable
         await StartServer();
 
         // Act
-        Program.SendFile("localhost", testFile);
+        var client = new FileTransferClient("localhost");
+        client.SendFile(testFile);
         await Task.Delay(1000); // Give time for transfer to complete
 
         // Assert
@@ -121,7 +129,8 @@ public class FileTransferTests : IDisposable
         await StartServer();
 
         // Act
-        Program.SendDirectory("localhost", testDir);
+        var client = new FileTransferClient("localhost");
+        client.SendDirectory(testDir);
         await Task.Delay(2000); // Give time for transfer to complete
 
         // Assert
@@ -142,7 +151,8 @@ public class FileTransferTests : IDisposable
         await StartServer();
 
         // Act
-        Program.SendFile("localhost", testFile);
+        var client = new FileTransferClient("localhost");
+        client.SendFile(testFile);
         await Task.Delay(2000); // Give more time for large file
 
         // Assert
@@ -161,7 +171,8 @@ public class FileTransferTests : IDisposable
         await StartServer();
 
         // Act
-        Program.SendFile("localhost", testFile);
+        var client = new FileTransferClient("localhost");
+        client.SendFile(testFile);
         await Task.Delay(1000);
 
         // Assert
@@ -180,9 +191,7 @@ public class FileTransferTests : IDisposable
 
         // Act & Assert
         var nonExistentFile = Path.Combine(_testDir, "nonexistent.txt");
-        Assert.Throws<FileNotFoundException>(() =>
-        {
-            Program.SendFile("localhost", nonExistentFile);
-        });
+        var client = new FileTransferClient("localhost");
+        Assert.Throws<FileNotFoundException>(() => client.SendFile(nonExistentFile));
     }
 } 

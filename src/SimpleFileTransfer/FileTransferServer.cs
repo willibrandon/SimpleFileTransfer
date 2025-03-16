@@ -148,7 +148,7 @@ public class FileTransferServer
                 if (now - lastUpdate >= 100)
                 {
                     var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                    Program.DisplayProgress(bytesRead, filesize, bytesPerSecond);
+                    FileOperations.DisplayProgress(bytesRead, filesize, bytesPerSecond);
                     lastUpdate = now;
                     lastBytes = bytesRead;
                 }
@@ -158,16 +158,17 @@ public class FileTransferServer
             fileStream.Close();
             
             // Verify hash
-            var receivedHash = Program.CalculateHash(savePath);
-            if (sourceHash == receivedHash)
+            Console.Write("Verifying file hash... ");
+            var calculatedHash = FileOperations.CalculateHash(savePath);
+            if (sourceHash == calculatedHash)
             {
-                Console.WriteLine($"File received and verified: {savePath}");
+                Console.WriteLine("File received and verified: " + savePath);
             }
             else
             {
-                Console.WriteLine($"Warning: File hash mismatch!");
-                Console.WriteLine($"Expected: {sourceHash}");
-                Console.WriteLine($"Received: {receivedHash}");
+                Console.WriteLine("Warning: File hash mismatch!");
+                Console.WriteLine("Expected: " + sourceHash);
+                Console.WriteLine("Calculated: " + calculatedHash);
             }
         }
         
@@ -221,7 +222,7 @@ public class FileTransferServer
             if (now - lastUpdate >= 100)
             {
                 var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                Program.DisplayProgress(bytesRead, filesize, bytesPerSecond);
+                FileOperations.DisplayProgress(bytesRead, filesize, bytesPerSecond);
                 lastUpdate = now;
                 lastBytes = bytesRead;
             }
@@ -231,16 +232,17 @@ public class FileTransferServer
         fileStream.Close();
         
         // Verify hash
-        var receivedHash = Program.CalculateHash(savePath);
-        if (sourceHash == receivedHash)
+        Console.Write("Verifying file hash... ");
+        var calculatedHash = FileOperations.CalculateHash(savePath);
+        if (sourceHash == calculatedHash)
         {
-            Console.WriteLine($"File received and verified: {savePath}");
+            Console.WriteLine("File received and verified: " + savePath);
         }
         else
         {
-            Console.WriteLine($"Warning: File hash mismatch!");
-            Console.WriteLine($"Expected: {sourceHash}");
-            Console.WriteLine($"Received: {receivedHash}");
+            Console.WriteLine("Warning: File hash mismatch!");
+            Console.WriteLine("Expected: " + sourceHash);
+            Console.WriteLine("Calculated: " + calculatedHash);
         }
     }
 }

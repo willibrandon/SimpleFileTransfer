@@ -42,7 +42,7 @@ public class FileTransferClient
         
         // Calculate hash before sending
         Console.Write("Calculating file hash... ");
-        var hash = Program.CalculateHash(filepath);
+        var hash = FileOperations.CalculateHash(filepath);
         Console.WriteLine("done");
         
         try
@@ -77,7 +77,7 @@ public class FileTransferClient
                 if (now - lastUpdate >= 100)
                 {
                     var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                    Program.DisplayProgress(bytesRead, fileInfo.Length, bytesPerSecond);
+                    FileOperations.DisplayProgress(bytesRead, fileInfo.Length, bytesPerSecond);
                     lastUpdate = now;
                     lastBytes = bytesRead;
                 }
@@ -135,7 +135,7 @@ public class FileTransferClient
                 Console.WriteLine($"\nSending file {index + 1}/{files.Length}: {relativePath}");
                 
                 // Calculate hash
-                var hash = Program.CalculateHash(file);
+                var hash = FileOperations.CalculateHash(file);
                 
                 // Send relative path
                 writer.Write(relativePath);
@@ -162,7 +162,7 @@ public class FileTransferClient
                     if (now - lastUpdate >= 100)
                     {
                         var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                        Program.DisplayProgress(bytesRead, fileInfo.Length, bytesPerSecond);
+                        FileOperations.DisplayProgress(bytesRead, fileInfo.Length, bytesPerSecond);
                         lastUpdate = now;
                         lastBytes = bytesRead;
                     }
