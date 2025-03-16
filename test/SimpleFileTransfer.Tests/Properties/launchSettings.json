@@ -1,8 +1,7 @@
 {
   "profiles": {
-    "SimpleFileTransfer": {
-      "commandName": "Project",
-      "commandLineArgs": "receive"
+    "SimpleFileTransfer.Tests": {
+      "commandName": "Project"
     },
     "Container (Dockerfile)": {
       "commandName": "Docker"
