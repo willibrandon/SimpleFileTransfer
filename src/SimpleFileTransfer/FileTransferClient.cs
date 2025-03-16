@@ -6,17 +6,30 @@ using System.Net.Sockets;
 
 namespace SimpleFileTransfer;
 
+/// <summary>
+/// Handles client-side file transfer operations, including sending files and directories.
+/// </summary>
 public class FileTransferClient
 {
     private readonly string _host;
     private readonly int _port;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FileTransferClient"/> class.
+    /// </summary>
+    /// <param name="host">The hostname or IP address of the server to connect to.</param>
+    /// <param name="port">The port number to connect to. Defaults to <see cref="Program.Port"/>.</param>
     public FileTransferClient(string host, int port = Program.Port)
     {
         _host = host;
         _port = port;
     }
 
+    /// <summary>
+    /// Sends a single file to the server.
+    /// </summary>
+    /// <param name="filepath">The path to the file to send.</param>
+    /// <exception cref="FileNotFoundException">Thrown when the specified file does not exist.</exception>
     public void SendFile(string filepath)
     {
         if (!File.Exists(filepath))
@@ -80,6 +93,11 @@ public class FileTransferClient
         }
     }
 
+    /// <summary>
+    /// Sends a directory and all its contents to the server.
+    /// </summary>
+    /// <param name="dirPath">The path to the directory to send.</param>
+    /// <exception cref="DirectoryNotFoundException">Thrown when the specified directory does not exist.</exception>
     public void SendDirectory(string dirPath)
     {
         if (!Directory.Exists(dirPath))

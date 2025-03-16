@@ -8,11 +8,19 @@ using System.Threading;
 
 namespace SimpleFileTransfer;
 
+/// <summary>
+/// Handles server-side file transfer operations, including receiving files and directories.
+/// </summary>
 public class FileTransferServer
 {
     private readonly int _port;
     private readonly string _downloadsDirectory;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FileTransferServer"/> class.
+    /// </summary>
+    /// <param name="downloadsDirectory">The directory where received files will be saved.</param>
+    /// <param name="port">The port number to listen on. Defaults to <see cref="Program.Port"/>.</param>
     public FileTransferServer(string downloadsDirectory, int port = Program.Port)
     {
         _port = port;
@@ -20,6 +28,10 @@ public class FileTransferServer
         Directory.CreateDirectory(_downloadsDirectory);
     }
 
+    /// <summary>
+    /// Starts the file transfer server and listens for incoming connections.
+    /// </summary>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     public void Start(CancellationToken cancellationToken = default)
     {
         var listener = new TcpListener(IPAddress.Any, _port);
@@ -76,6 +88,11 @@ public class FileTransferServer
         }
     }
 
+    /// <summary>
+    /// Receives a directory and all its contents from a client.
+    /// </summary>
+    /// <param name="reader">The binary reader for reading from the network stream.</param>
+    /// <param name="stream">The network stream connected to the client.</param>
     private void ReceiveDirectory(BinaryReader reader, NetworkStream stream)
     {
         // Read base directory name
@@ -157,6 +174,12 @@ public class FileTransferServer
         Console.WriteLine("\nDirectory received successfully");
     }
 
+    /// <summary>
+    /// Receives a single file from a client.
+    /// </summary>
+    /// <param name="reader">The binary reader for reading from the network stream.</param>
+    /// <param name="stream">The network stream connected to the client.</param>
+    /// <param name="filename">The name of the file being received.</param>
     private void ReceiveFile(BinaryReader reader, NetworkStream stream, string filename)
     {
         // Read filesize
