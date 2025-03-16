@@ -14,6 +14,7 @@ public class FileTransferClient
     private readonly string _host;
     private readonly int _port;
     private readonly bool _useCompression;
+    private readonly CompressionHelper.CompressionAlgorithm _compressionAlgorithm;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FileTransferClient"/> class.
@@ -21,11 +22,14 @@ public class FileTransferClient
     /// <param name="host">The hostname or IP address of the server to connect to.</param>
     /// <param name="port">The port number to connect to. Defaults to <see cref="Program.Port"/>.</param>
     /// <param name="useCompression">Whether to use compression for file transfers. Defaults to false.</param>
-    public FileTransferClient(string host, int port = Program.Port, bool useCompression = false)
+    /// <param name="compressionAlgorithm">The compression algorithm to use. Defaults to GZip.</param>
+    public FileTransferClient(string host, int port = Program.Port, bool useCompression = false, 
+        CompressionHelper.CompressionAlgorithm compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip)
     {
         _host = host;
         _port = port;
         _useCompression = useCompression;
+        _compressionAlgorithm = compressionAlgorithm;
     }
 
     /// <summary>
@@ -42,7 +46,7 @@ public class FileTransferClient
         
         var fileInfo = new FileInfo(filepath);
         Console.WriteLine($"Sending {fileInfo.Name} ({fileInfo.Length:N0} bytes) to {_host}");
-        Console.WriteLine($"Compression: {(_useCompression ? "Enabled" : "Disabled")}");
+        Console.WriteLine($"Compression: {(_useCompression ? $"Enabled ({_compressionAlgorithm})" : "Disabled")}");
         
         // Calculate hash before sending
         Console.Write("Calculating file hash... ");
@@ -70,7 +74,10 @@ public class FileTransferClient
             
             if (_useCompression)
             {
-                Console.WriteLine("Compressing data...");
+                // Send compression algorithm
+                writer.Write((int)_compressionAlgorithm);
+                
+                Console.WriteLine($"Compressing data using {_compressionAlgorithm}...");
                 
                 // Create a temporary file for compressed data
                 var tempFile = Path.GetTempFileName();
@@ -79,7 +86,7 @@ public class FileTransferClient
                     // Compress the file
                     using (var compressedFileStream = File.Create(tempFile))
                     {
-                        CompressionHelper.Compress(fileStream, compressedFileStream);
+                        CompressionHelper.Compress(fileStream, compressedFileStream, _compressionAlgorithm);
                     }
                     
                     // Get compressed size
@@ -179,7 +186,7 @@ public class FileTransferClient
         Console.WriteLine($"Preparing to send directory: {dirPath}");
         Console.WriteLine($"Total files: {files.Length}");
         Console.WriteLine($"Total size: {totalSize:N0} bytes");
-        Console.WriteLine($"Compression: {(_useCompression ? "Enabled" : "Disabled")}");
+        Console.WriteLine($"Compression: {(_useCompression ? $"Enabled ({_compressionAlgorithm})" : "Disabled")}");
         
         try
         {
@@ -192,6 +199,13 @@ public class FileTransferClient
             writer.Write("DIR:");
             // Send compression flag
             writer.Write(_useCompression);
+            
+            if (_useCompression)
+            {
+                // Send compression algorithm
+                writer.Write((int)_compressionAlgorithm);
+            }
+            
             // Send base directory name
             writer.Write(dirInfo.Name);
             // Send number of files
@@ -219,7 +233,7 @@ public class FileTransferClient
                 
                 if (_useCompression)
                 {
-                    Console.WriteLine("Compressing data...");
+                    Console.WriteLine($"Compressing data using {_compressionAlgorithm}...");
                     
                     // Create a temporary file for compressed data
                     var tempFile = Path.GetTempFileName();
@@ -228,7 +242,7 @@ public class FileTransferClient
                         // Compress the file
                         using (var compressedFileStream = File.Create(tempFile))
                         {
-                            CompressionHelper.Compress(fileStream, compressedFileStream);
+                            CompressionHelper.Compress(fileStream, compressedFileStream, _compressionAlgorithm);
                         }
                         
                         // Get compressed size

@@ -48,9 +48,25 @@ public class Program
         {
             var host = args[1];
             var path = args[2];
-            var useCompression = args.Length > 3 && args[3] == "--compress";
+            var useCompression = false;
+            var compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip;
             
-            var client = new FileTransferClient(host, Port, useCompression);
+            // Parse compression options
+            for (int i = 3; i < args.Length; i++)
+            {
+                if (args[i] == "--compress" || args[i] == "--gzip")
+                {
+                    useCompression = true;
+                    compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip;
+                }
+                else if (args[i] == "--brotli")
+                {
+                    useCompression = true;
+                    compressionAlgorithm = CompressionHelper.CompressionAlgorithm.Brotli;
+                }
+            }
+            
+            var client = new FileTransferClient(host, Port, useCompression, compressionAlgorithm);
             
             if (Directory.Exists(path))
             {
@@ -81,12 +97,14 @@ public class Program
         Console.WriteLine("Usage:");
         Console.WriteLine("  receive                      - Start receiving files");
         Console.WriteLine("  send <host> <path>           - Send a file or directory");
-        Console.WriteLine("  send <host> <path> --compress - Send a file or directory with compression");
+        Console.WriteLine("  send <host> <path> --compress - Send a file or directory with GZip compression");
+        Console.WriteLine("  send <host> <path> --gzip    - Send a file or directory with GZip compression");
+        Console.WriteLine("  send <host> <path> --brotli  - Send a file or directory with Brotli compression");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  SimpleFileTransfer receive");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --compress");
-        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfolder --compress");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfolder --brotli");
     }
 }

@@ -4,30 +4,78 @@ using System.IO.Compression;
 namespace SimpleFileTransfer;
 
 /// <summary>
-/// Provides utility methods for compressing and decompressing data using GZip compression.
+/// Provides utility methods for compressing and decompressing data using different compression algorithms.
 /// </summary>
 public static class CompressionHelper
 {
     /// <summary>
-    /// Compresses a stream using GZip compression.
+    /// Specifies the compression algorithm to use.
+    /// </summary>
+    public enum CompressionAlgorithm
+    {
+        /// <summary>
+        /// GZip compression algorithm.
+        /// </summary>
+        GZip,
+        
+        /// <summary>
+        /// Brotli compression algorithm.
+        /// </summary>
+        Brotli
+    }
+    
+    /// <summary>
+    /// Compresses a stream using the specified compression algorithm.
     /// </summary>
     /// <param name="source">The source stream to compress.</param>
     /// <param name="destination">The destination stream to write compressed data to.</param>
-    public static void Compress(Stream source, Stream destination)
+    /// <param name="algorithm">The compression algorithm to use. Defaults to GZip.</param>
+    public static void Compress(Stream source, Stream destination, CompressionAlgorithm algorithm = CompressionAlgorithm.GZip)
     {
-        using var compressionStream = new GZipStream(destination, CompressionMode.Compress, true);
-        source.CopyTo(compressionStream);
+        switch (algorithm)
+        {
+            case CompressionAlgorithm.Brotli:
+                using (var compressionStream = new BrotliStream(destination, CompressionMode.Compress, true))
+                {
+                    source.CopyTo(compressionStream);
+                }
+                break;
+                
+            case CompressionAlgorithm.GZip:
+            default:
+                using (var compressionStream = new GZipStream(destination, CompressionMode.Compress, true))
+                {
+                    source.CopyTo(compressionStream);
+                }
+                break;
+        }
     }
 
     /// <summary>
-    /// Decompresses a stream using GZip decompression.
+    /// Decompresses a stream using the specified compression algorithm.
     /// </summary>
     /// <param name="source">The source stream containing compressed data.</param>
     /// <param name="destination">The destination stream to write decompressed data to.</param>
-    public static void Decompress(Stream source, Stream destination)
+    /// <param name="algorithm">The compression algorithm to use. Defaults to GZip.</param>
+    public static void Decompress(Stream source, Stream destination, CompressionAlgorithm algorithm = CompressionAlgorithm.GZip)
     {
-        using var decompressionStream = new GZipStream(source, CompressionMode.Decompress, true);
-        decompressionStream.CopyTo(destination);
+        switch (algorithm)
+        {
+            case CompressionAlgorithm.Brotli:
+                using (var decompressionStream = new BrotliStream(source, CompressionMode.Decompress, true))
+                {
+                    decompressionStream.CopyTo(destination);
+                }
+                break;
+                
+            case CompressionAlgorithm.GZip:
+            default:
+                using (var decompressionStream = new GZipStream(source, CompressionMode.Decompress, true))
+                {
+                    decompressionStream.CopyTo(destination);
+                }
+                break;
+        }
     }
 
     /// <summary>

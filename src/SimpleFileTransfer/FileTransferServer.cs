@@ -97,6 +97,14 @@ public class FileTransferServer
     {
         // Read compression flag
         var useCompression = reader.ReadBoolean();
+        
+        // Read compression algorithm if compression is enabled
+        var compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip;
+        if (useCompression)
+        {
+            compressionAlgorithm = (CompressionHelper.CompressionAlgorithm)reader.ReadInt32();
+        }
+        
         // Read base directory name
         var dirName = reader.ReadString();
         // Read number of files
@@ -104,7 +112,7 @@ public class FileTransferServer
         
         Console.WriteLine($"Receiving directory: {dirName}");
         Console.WriteLine($"Total files: {fileCount}");
-        Console.WriteLine($"Compression: {(useCompression ? "Enabled" : "Disabled")}");
+        Console.WriteLine($"Compression: {(useCompression ? $"Enabled ({compressionAlgorithm})" : "Disabled")}");
         
         // Create downloads directory
         var downloadsDir = Path.Combine(_downloadsDirectory, dirName);
@@ -171,13 +179,13 @@ public class FileTransferServer
                     }
                     
                     Console.WriteLine();
-                    Console.WriteLine("Decompressing data...");
+                    Console.WriteLine($"Decompressing data using {compressionAlgorithm}...");
                     
                     // Decompress data to final location
                     using (var compressedFileStream = File.OpenRead(tempFile))
                     using (var decompressedFileStream = File.Create(savePath))
                     {
-                        CompressionHelper.Decompress(compressedFileStream, decompressedFileStream);
+                        CompressionHelper.Decompress(compressedFileStream, decompressedFileStream, compressionAlgorithm);
                     }
                 }
                 finally
@@ -252,13 +260,20 @@ public class FileTransferServer
         // Read hash
         var sourceHash = reader.ReadString();
         
+        // Read compression algorithm if compression is enabled
+        var compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip;
+        if (useCompression)
+        {
+            compressionAlgorithm = (CompressionHelper.CompressionAlgorithm)reader.ReadInt32();
+        }
+        
         // Create downloads directory
         Directory.CreateDirectory(_downloadsDirectory);
         
         // Create full save path
         var savePath = Path.Combine(_downloadsDirectory, filename);
         Console.WriteLine($"Receiving file: {filename} ({originalSize:N0} bytes)");
-        Console.WriteLine($"Compression: {(useCompression ? "Enabled" : "Disabled")}");
+        Console.WriteLine($"Compression: {(useCompression ? $"Enabled ({compressionAlgorithm})" : "Disabled")}");
         Console.WriteLine($"Saving to: {savePath}");
         
         // Create directory if needed
@@ -307,13 +322,13 @@ public class FileTransferServer
                 }
                 
                 Console.WriteLine();
-                Console.WriteLine("Decompressing data...");
+                Console.WriteLine($"Decompressing data using {compressionAlgorithm}...");
                 
                 // Decompress data to final location
                 using (var compressedFileStream = File.OpenRead(tempFile))
                 using (var decompressedFileStream = File.Create(savePath))
                 {
-                    CompressionHelper.Decompress(compressedFileStream, decompressedFileStream);
+                    CompressionHelper.Decompress(compressedFileStream, decompressedFileStream, compressionAlgorithm);
                 }
             }
             finally

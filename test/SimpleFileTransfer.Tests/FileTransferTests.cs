@@ -195,27 +195,31 @@ public class FileTransferTests : IDisposable
         Assert.Throws<FileNotFoundException>(() => client.SendFile(nonExistentFile));
     }
 
-    [Fact]
-    public async Task CompressedFileTransfer_Success()
+    [Theory]
+    [InlineData(CompressionHelper.CompressionAlgorithm.GZip)]
+    [InlineData(CompressionHelper.CompressionAlgorithm.Brotli)]
+    public async Task CompressedFileTransfer_Success(CompressionHelper.CompressionAlgorithm algorithm)
     {
         // Arrange
         var content = new string('X', 1024 * 1024); // 1MB of data that should compress well
-        var testFile = CreateTestFile("compressed.txt", content);
+        var testFile = CreateTestFile($"compressed_{algorithm}.txt", content);
         await StartServer();
 
         // Act
-        var client = new FileTransferClient("localhost", Program.Port, useCompression: true);
+        var client = new FileTransferClient("localhost", Program.Port, useCompression: true, algorithm);
         client.SendFile(testFile);
         await Task.Delay(3000); // Give time for transfer to complete
 
         // Assert
-        var downloadedFile = Path.Combine(_downloadDir, "compressed.txt");
+        var downloadedFile = Path.Combine(_downloadDir, $"compressed_{algorithm}.txt");
         Assert.True(File.Exists(downloadedFile));
         Assert.Equal(content, File.ReadAllText(downloadedFile));
     }
 
-    [Fact]
-    public async Task CompressedDirectoryTransfer_Success()
+    [Theory]
+    [InlineData(CompressionHelper.CompressionAlgorithm.GZip)]
+    [InlineData(CompressionHelper.CompressionAlgorithm.Brotli)]
+    public async Task CompressedDirectoryTransfer_Success(CompressionHelper.CompressionAlgorithm algorithm)
     {
         // Arrange
         var files = new Dictionary<string, string>
@@ -224,18 +228,18 @@ public class FileTransferTests : IDisposable
             { "compressible2.txt", new string('B', 10000) },
             { "subdir/compressible3.txt", new string('C', 10000) }
         };
-        var testDir = CreateTestDirectory("compressed_dir", files);
+        var testDir = CreateTestDirectory($"compressed_dir_{algorithm}", files);
         await StartServer();
 
         // Act
-        var client = new FileTransferClient("localhost", Program.Port, useCompression: true);
+        var client = new FileTransferClient("localhost", Program.Port, useCompression: true, algorithm);
         client.SendDirectory(testDir);
         await Task.Delay(3000); // Give time for transfer to complete
 
         // Assert
         foreach (var (file, content) in files)
         {
-            var downloadedFile = Path.Combine(_downloadDir, "compressed_dir", file);
+            var downloadedFile = Path.Combine(_downloadDir, $"compressed_dir_{algorithm}", file);
             Assert.True(File.Exists(downloadedFile), $"File should exist: {file}");
             Assert.Equal(content, File.ReadAllText(downloadedFile));
         }
