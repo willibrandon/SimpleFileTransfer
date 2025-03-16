@@ -471,24 +471,38 @@ public class TransferQueueTests : IDisposable
     public void QueueClear_RemovesAllTransfers()
     {
         // Arrange
-        var file1 = CreateTestFile("queue_clear1.txt", "Queue clear test 1");
-        var file2 = CreateTestFile("queue_clear2.txt", "Queue clear test 2");
-        var file3 = CreateTestFile("queue_clear3.txt", "Queue clear test 3");
+        // Set up console redirection
+        var writer = new StringWriter();
+        var originalOut = Console.Out;
+        Console.SetOut(writer);
+        
+        try
+        {
+            var file1 = CreateTestFile("queue_clear1.txt", "Queue clear test 1");
+            var file2 = CreateTestFile("queue_clear2.txt", "Queue clear test 2");
+            var file3 = CreateTestFile("queue_clear3.txt", "Queue clear test 3");
 
-        // Create a new queue for this test
-        var queue = new TransferQueue();
+            // Create a new queue for this test
+            var queue = new TransferQueue();
 
-        // Act
-        queue.Enqueue(new QueuedFileTransfer("localhost", file1));
-        queue.Enqueue(new QueuedFileTransfer("localhost", file2));
-        queue.Enqueue(new QueuedFileTransfer("localhost", file3));
-        
-        Assert.Equal(3, queue.Count);
-        
-        queue.Clear();
-        
-        // Assert
-        Assert.Equal(0, queue.Count);
+            // Act
+            queue.Enqueue(new QueuedFileTransfer("localhost", file1));
+            queue.Enqueue(new QueuedFileTransfer("localhost", file2));
+            queue.Enqueue(new QueuedFileTransfer("localhost", file3));
+            
+            Assert.Equal(3, queue.Count);
+            
+            queue.Clear();
+            
+            // Assert
+            Assert.Equal(0, queue.Count);
+        }
+        finally
+        {
+            // Restore console
+            Console.SetOut(originalOut);
+            writer.Dispose();
+        }
     }
 
     [Fact]

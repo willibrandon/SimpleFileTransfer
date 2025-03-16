@@ -2,12 +2,12 @@ services:
   simplefiletransfer:
     image: ${DOCKER_REGISTRY-}simplefiletransfer
     build:
-      context: .
+      context: ..
       dockerfile: src/SimpleFileTransfer/Dockerfile
 
   simplefiletransfer.tests:
     image: ${DOCKER_REGISTRY-}simplefiletransfertests
     build:
-      context: .
+      context: ..
       dockerfile: test/SimpleFileTransfer.Tests/Dockerfile
 

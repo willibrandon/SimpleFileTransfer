@@ -3,10 +3,21 @@
 # Set a timeout for the test process
 $timeout = 120 # seconds
 
+# Create logs directory if it doesn't exist
+$logsDir = Join-Path $PSScriptRoot ".." "logs"
+if (-not (Test-Path $logsDir)) {
+    New-Item -ItemType Directory -Path $logsDir | Out-Null
+}
+
+# Create a timestamped log filename
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$logFile = Join-Path $logsDir "test-output_$timestamp.log"
+
 Write-Host "Running tests with a $timeout second timeout..." -ForegroundColor Cyan
+Write-Host "Log will be saved to: $logFile" -ForegroundColor Cyan
 
 # Start the test process and capture its output
-$process = Start-Process -FilePath "dotnet" -ArgumentList "test", "./SimpleFileTransfer.sln", "-v", "d" -PassThru -NoNewWindow -RedirectStandardOutput "test-output.log"
+$process = Start-Process -FilePath "dotnet" -ArgumentList "test", "./SimpleFileTransfer.sln", "-v", "d" -PassThru -NoNewWindow -RedirectStandardOutput $logFile
 
 # Wait for the process to complete or timeout
 $completed = $process.WaitForExit($timeout * 1000)
@@ -16,16 +27,16 @@ if (-not $completed) {
     $process.Kill()
     
     # Display the last few lines of output
-    if (Test-Path "test-output.log") {
+    if (Test-Path $logFile) {
         Write-Host "Last output from tests:" -ForegroundColor Yellow
-        Get-Content "test-output.log" -Tail 20
+        Get-Content $logFile -Tail 20
     }
     
     exit 1
 } else {
     # Display the test results
-    if (Test-Path "test-output.log") {
-        Get-Content "test-output.log"
+    if (Test-Path $logFile) {
+        Get-Content $logFile
     }
     
     if ($process.ExitCode -eq 0) {

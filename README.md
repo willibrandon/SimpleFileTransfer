@@ -23,7 +23,7 @@ Open the solution in Visual Studio and use the Test Explorer to run the tests.
 Use the provided PowerShell script to run tests with a timeout to prevent hanging:
 
 ```powershell
-.\run-tests.ps1
+.\scripts\run-tests.ps1
 ```
 
 ### Using dotnet CLI
@@ -36,30 +36,30 @@ Note: Running tests directly with `dotnet test` may occasionally hang due to bac
 
 ## Docker Support
 
-The project includes Docker support for both the application and tests.
+The project includes Docker support for both the application and tests. Docker configuration files are located in the `docker` directory.
 
 ### Building and Running with Docker
 
 ```bash
 # Build the Docker image
-docker-compose build
+docker-compose -f docker/docker-compose.yml build
 
 # Run the application in Docker
-docker-compose up simplefiletransfer
+docker-compose -f docker/docker-compose.yml up simplefiletransfer
 ```
 
 ### Running Tests in Docker
 
 ```bash
 # Build and run the tests in Docker
-docker-compose build simplefiletransfer.tests
+docker-compose -f docker/docker-compose.yml build simplefiletransfer.tests
 docker run --rm simplefiletransfertests:latest
 ```
 
 Alternatively, use the provided PowerShell script:
 
 ```powershell
-.\run-tests-in-docker.ps1
+.\scripts\run-tests-in-docker.ps1
 ```
 
 ## Usage
