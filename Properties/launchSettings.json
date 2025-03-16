@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SimpleFileTransfer": {
+      "commandName": "Project",
+      "commandLineArgs": "receive"
+    }
+  }
+}
