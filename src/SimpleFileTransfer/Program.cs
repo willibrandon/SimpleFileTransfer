@@ -30,6 +30,11 @@ public class Program
     }
     
     /// <summary>
+    /// The transfer queue for managing sequential file transfers.
+    /// </summary>
+    public static readonly TransferQueue Queue = new();
+    
+    /// <summary>
     /// Main entry point for the application.
     /// </summary>
     /// <param name="args">Command-line arguments.</param>
@@ -85,6 +90,7 @@ public class Program
             var useEncryption = false;
             var password = string.Empty;
             var resumeEnabled = false;
+            var queueTransfer = false;
             
             // Collect all paths before options
             int i = 2;
@@ -116,29 +122,92 @@ public class Program
                 {
                     resumeEnabled = true;
                 }
+                else if (args[i] == "--queue")
+                {
+                    queueTransfer = true;
+                }
             }
             
             try
             {
-                var client = new FileTransferClient(
-                    host, 
-                    Port, 
-                    useCompression, 
-                    compressionAlgorithm, 
-                    useEncryption, 
-                    password,
-                    resumeEnabled);
-                
                 if (paths.Count == 1)
                 {
                     var path = paths[0];
                     if (Directory.Exists(path))
                     {
-                        client.SendDirectory(path);
+                        if (queueTransfer)
+                        {
+                            // Add to queue
+                            var transfer = new QueuedDirectoryTransfer(
+                                host,
+                                path,
+                                useCompression,
+                                compressionAlgorithm,
+                                useEncryption,
+                                password,
+                                resumeEnabled);
+                            
+                            Queue.Enqueue(transfer);
+                            
+                            // Start queue if not already processing
+                            if (!Queue.IsProcessing)
+                            {
+                                Console.WriteLine("Starting queue processing...");
+                                Queue.Start();
+                            }
+                        }
+                        else
+                        {
+                            // Execute immediately
+                            var client = new FileTransferClient(
+                                host, 
+                                Port, 
+                                useCompression, 
+                                compressionAlgorithm, 
+                                useEncryption, 
+                                password,
+                                resumeEnabled);
+                            
+                            client.SendDirectory(path);
+                        }
                     }
                     else if (File.Exists(path))
                     {
-                        client.SendFile(path);
+                        if (queueTransfer)
+                        {
+                            // Add to queue
+                            var transfer = new QueuedFileTransfer(
+                                host,
+                                path,
+                                useCompression,
+                                compressionAlgorithm,
+                                useEncryption,
+                                password,
+                                resumeEnabled);
+                            
+                            Queue.Enqueue(transfer);
+                            
+                            // Start queue if not already processing
+                            if (!Queue.IsProcessing)
+                            {
+                                Console.WriteLine("Starting queue processing...");
+                                Queue.Start();
+                            }
+                        }
+                        else
+                        {
+                            // Execute immediately
+                            var client = new FileTransferClient(
+                                host, 
+                                Port, 
+                                useCompression, 
+                                compressionAlgorithm, 
+                                useEncryption, 
+                                password,
+                                resumeEnabled);
+                            
+                            client.SendFile(path);
+                        }
                     }
                     else
                     {
@@ -176,8 +245,42 @@ public class Program
                     
                     if (validFiles.Count != 0)
                     {
-                        Console.WriteLine($"Sending {validFiles.Count} files to {host}");
-                        client.SendMultipleFiles(validFiles);
+                        if (queueTransfer)
+                        {
+                            // Add to queue
+                            var transfer = new QueuedMultiFileTransfer(
+                                host,
+                                validFiles,
+                                useCompression,
+                                compressionAlgorithm,
+                                useEncryption,
+                                password,
+                                resumeEnabled);
+                            
+                            Queue.Enqueue(transfer);
+                            
+                            // Start queue if not already processing
+                            if (!Queue.IsProcessing)
+                            {
+                                Console.WriteLine("Starting queue processing...");
+                                Queue.Start();
+                            }
+                        }
+                        else
+                        {
+                            // Execute immediately
+                            var client = new FileTransferClient(
+                                host, 
+                                Port, 
+                                useCompression, 
+                                compressionAlgorithm, 
+                                useEncryption, 
+                                password,
+                                resumeEnabled);
+                            
+                            Console.WriteLine($"Sending {validFiles.Count} files to {host}");
+                            client.SendMultipleFiles(validFiles);
+                        }
                     }
                     else
                     {
@@ -212,6 +315,7 @@ public class Program
                 }
                 
                 string? password = null;
+                bool queueTransfer = false;
                 
                 // Parse options
                 for (int i = 2; i < args.Length; i++)
@@ -220,14 +324,171 @@ public class Program
                     {
                         password = args[++i];
                     }
+                    else if (args[i] == "--queue")
+                    {
+                        queueTransfer = true;
+                    }
                 }
                 
-                FileTransferClient.ResumeTransfer(index, password);
+                if (queueTransfer)
+                {
+                    // Get resume info
+                    var resumeFiles = TransferResumeManager.GetAllResumeFiles();
+                    
+                    if (resumeFiles.Count == 0)
+                    {
+                        Console.WriteLine("No incomplete transfers found.");
+                        return;
+                    }
+                    
+                    if (index < 1 || index > resumeFiles.Count)
+                    {
+                        Console.WriteLine($"Invalid index. Please specify a number between 1 and {resumeFiles.Count}.");
+                        return;
+                    }
+                    
+                    var info = resumeFiles[index - 1];
+                    
+                    if (info.UseEncryption && string.IsNullOrEmpty(password))
+                    {
+                        Console.WriteLine("This transfer is encrypted. Please provide a password using the --password option.");
+                        return;
+                    }
+                    
+                    if (!File.Exists(info.FilePath))
+                    {
+                        Console.WriteLine($"The file {info.FilePath} no longer exists. Cannot resume transfer.");
+                        return;
+                    }
+                    
+                    if (!string.IsNullOrEmpty(info.DirectoryName))
+                    {
+                        // Part of a directory transfer
+                        var dirPath = Path.GetDirectoryName(info.FilePath);
+                        if (dirPath != null && Directory.Exists(dirPath))
+                        {
+                            var transfer = new QueuedDirectoryTransfer(
+                                info.Host,
+                                dirPath,
+                                info.UseCompression,
+                                info.CompressionAlgorithm,
+                                info.UseEncryption,
+                                password,
+                                true);
+                            
+                            Queue.Enqueue(transfer);
+                            
+                            // Start queue if not already processing
+                            if (!Queue.IsProcessing)
+                            {
+                                Console.WriteLine("Starting queue processing...");
+                                Queue.Start();
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"The directory containing {info.FilePath} no longer exists. Cannot resume transfer.");
+                        }
+                    }
+                    else if (info.IsMultiFile)
+                    {
+                        // Part of a multi-file transfer
+                        var multiFileTransfers = resumeFiles
+                            .Where(r => r.IsMultiFile && r.Host == info.Host && r.Port == info.Port)
+                            .ToList();
+                        
+                        // Filter out files that no longer exist
+                        var validFiles = multiFileTransfers
+                            .Where(r => File.Exists(r.FilePath))
+                            .Select(r => r.FilePath)
+                            .ToList();
+                        
+                        if (validFiles.Count == 0)
+                        {
+                            Console.WriteLine("No valid files found for this multi-file transfer. Cannot resume.");
+                            return;
+                        }
+                        
+                        var transfer = new QueuedMultiFileTransfer(
+                            info.Host,
+                            validFiles,
+                            info.UseCompression,
+                            info.CompressionAlgorithm,
+                            info.UseEncryption,
+                            password,
+                            true);
+                        
+                        Queue.Enqueue(transfer);
+                        
+                        // Start queue if not already processing
+                        if (!Queue.IsProcessing)
+                        {
+                            Console.WriteLine("Starting queue processing...");
+                            Queue.Start();
+                        }
+                    }
+                    else
+                    {
+                        // Single file transfer
+                        var transfer = new QueuedFileTransfer(
+                            info.Host,
+                            info.FilePath,
+                            info.UseCompression,
+                            info.CompressionAlgorithm,
+                            info.UseEncryption,
+                            password,
+                            true);
+                        
+                        Queue.Enqueue(transfer);
+                        
+                        // Start queue if not already processing
+                        if (!Queue.IsProcessing)
+                        {
+                            Console.WriteLine("Starting queue processing...");
+                            Queue.Start();
+                        }
+                    }
+                }
+                else
+                {
+                    // Execute immediately
+                    FileTransferClient.ResumeTransfer(index, password);
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
             }
+        }
+        else if (args[0] == "queue-list")
+        {
+            Queue.ListTransfers();
+        }
+        else if (args[0] == "queue-start")
+        {
+            if (Queue.IsProcessing)
+            {
+                Console.WriteLine("Queue is already processing.");
+            }
+            else
+            {
+                Queue.Start();
+            }
+        }
+        else if (args[0] == "queue-stop")
+        {
+            if (!Queue.IsProcessing)
+            {
+                Console.WriteLine("Queue is not currently processing.");
+            }
+            else
+            {
+                Queue.Stop();
+            }
+        }
+        else if (args[0] == "queue-clear")
+        {
+            Queue.Clear();
         }
         else
         {
@@ -248,6 +509,10 @@ public class Program
         Console.WriteLine("  send <host> <path1> <path2>... [options] - Send multiple files");
         Console.WriteLine("  list-resume                            - List all incomplete transfers that can be resumed");
         Console.WriteLine("  resume <index> [options]               - Resume an incomplete transfer");
+        Console.WriteLine("  queue-list                             - List all transfers in the queue");
+        Console.WriteLine("  queue-start                            - Start processing the queue");
+        Console.WriteLine("  queue-stop                             - Stop processing the queue");
+        Console.WriteLine("  queue-clear                            - Clear all transfers from the queue");
         Console.WriteLine();
         Console.WriteLine("Options for receive:");
         Console.WriteLine("  --password <password>                  - Password for decrypting files");
@@ -258,9 +523,11 @@ public class Program
         Console.WriteLine("  --brotli                               - Use Brotli compression");
         Console.WriteLine("  --encrypt <password>                   - Encrypt data with the specified password");
         Console.WriteLine("  --resume                               - Enable resume capability for interrupted transfers");
+        Console.WriteLine("  --queue                                - Add the transfer to the queue instead of executing immediately");
         Console.WriteLine();
         Console.WriteLine("Options for resume:");
         Console.WriteLine("  --password <password>                  - Password for encryption (if the transfer is encrypted)");
+        Console.WriteLine("  --queue                                - Add the transfer to the queue instead of executing immediately");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  SimpleFileTransfer receive");
@@ -272,8 +539,15 @@ public class Program
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfolder --brotli");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --encrypt mysecretpassword");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --brotli --encrypt mysecretpassword --resume");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --queue");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 file1.txt file2.txt --queue");
         Console.WriteLine("  SimpleFileTransfer list-resume");
         Console.WriteLine("  SimpleFileTransfer resume 1");
         Console.WriteLine("  SimpleFileTransfer resume 1 --password mysecretpassword");
+        Console.WriteLine("  SimpleFileTransfer resume 1 --queue");
+        Console.WriteLine("  SimpleFileTransfer queue-list");
+        Console.WriteLine("  SimpleFileTransfer queue-start");
+        Console.WriteLine("  SimpleFileTransfer queue-stop");
+        Console.WriteLine("  SimpleFileTransfer queue-clear");
     }
 }
