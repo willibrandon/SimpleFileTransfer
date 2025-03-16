@@ -16,6 +16,7 @@ RUN dotnet restore "./test/SimpleFileTransfer.Tests/SimpleFileTransfer.Tests.csp
 COPY . .
 WORKDIR "/src/test/SimpleFileTransfer.Tests"
 RUN dotnet build "./SimpleFileTransfer.Tests.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet test "./SimpleFileTransfer.Tests.csproj" -c $BUILD_CONFIGURATION --logger "console;verbosity=detailed"
 
 # This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
