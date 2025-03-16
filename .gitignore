@@ -397,4 +397,20 @@ FodyWeavers.xsd
 *.msp
 
 # JetBrains Rider
-*.sln.iml 
+*.sln.iml
+
+# Web project specific (Vite/Vue.js)
+dist/
+dist-ssr/
+*.local
+
+# npm/yarn/pnpm
+.npm
+.yarn/
+.pnpm/
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnp.*
+.yarn-integrity 
