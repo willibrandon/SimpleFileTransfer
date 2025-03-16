@@ -95,6 +95,8 @@ public class FileTransferServer
     /// <param name="stream">The network stream connected to the client.</param>
     private void ReceiveDirectory(BinaryReader reader, NetworkStream stream)
     {
+        // Read compression flag
+        var useCompression = reader.ReadBoolean();
         // Read base directory name
         var dirName = reader.ReadString();
         // Read number of files
@@ -102,6 +104,7 @@ public class FileTransferServer
         
         Console.WriteLine($"Receiving directory: {dirName}");
         Console.WriteLine($"Total files: {fileCount}");
+        Console.WriteLine($"Compression: {(useCompression ? "Enabled" : "Disabled")}");
         
         // Create downloads directory
         var downloadsDir = Path.Combine(_downloadsDirectory, dirName);
@@ -111,8 +114,8 @@ public class FileTransferServer
         {
             // Read relative path
             var relativePath = reader.ReadString();
-            // Read filesize
-            var filesize = reader.ReadInt64();
+            // Read original filesize
+            var originalSize = reader.ReadInt64();
             // Read hash
             var sourceHash = reader.ReadString();
             
@@ -129,33 +132,92 @@ public class FileTransferServer
                 Directory.CreateDirectory(dir);
             }
             
-            // Receive and save file
-            using var fileStream = File.Create(savePath);
-            var buffer = new byte[8192];
-            var bytesRead = 0L;
-            var sw = Stopwatch.StartNew();
-            var lastUpdate = sw.ElapsedMilliseconds;
-            var lastBytes = 0L;
-            
-            while (bytesRead < filesize)
+            if (useCompression)
             {
-                var chunkSize = (int)Math.Min(buffer.Length, filesize - bytesRead);
-                var read = stream.Read(buffer, 0, chunkSize);
-                fileStream.Write(buffer, 0, read);
-                bytesRead += read;
+                // Read compressed size
+                var compressedSize = reader.ReadInt64();
+                var ratio = CompressionHelper.GetCompressionRatio(originalSize, compressedSize);
+                Console.WriteLine($"Compressed size: {compressedSize:N0} bytes ({ratio:F2}% reduction)");
                 
-                var now = sw.ElapsedMilliseconds;
-                if (now - lastUpdate >= 100)
+                // Create a temporary file for compressed data
+                var tempFile = Path.GetTempFileName();
+                try
                 {
-                    var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                    FileOperations.DisplayProgress(bytesRead, filesize, bytesPerSecond);
-                    lastUpdate = now;
-                    lastBytes = bytesRead;
+                    // Receive compressed data to temporary file
+                    using (var tempFileStream = File.Create(tempFile))
+                    {
+                        var buffer = new byte[8192];
+                        var bytesRead = 0L;
+                        var sw = Stopwatch.StartNew();
+                        var lastUpdate = sw.ElapsedMilliseconds;
+                        var lastBytes = 0L;
+                        
+                        while (bytesRead < compressedSize)
+                        {
+                            var chunkSize = (int)Math.Min(buffer.Length, compressedSize - bytesRead);
+                            var read = stream.Read(buffer, 0, chunkSize);
+                            tempFileStream.Write(buffer, 0, read);
+                            bytesRead += read;
+                            
+                            var now = sw.ElapsedMilliseconds;
+                            if (now - lastUpdate >= 100)
+                            {
+                                var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                                FileOperations.DisplayProgress(bytesRead, compressedSize, bytesPerSecond);
+                                lastUpdate = now;
+                                lastBytes = bytesRead;
+                            }
+                        }
+                    }
+                    
+                    Console.WriteLine();
+                    Console.WriteLine("Decompressing data...");
+                    
+                    // Decompress data to final location
+                    using (var compressedFileStream = File.OpenRead(tempFile))
+                    using (var decompressedFileStream = File.Create(savePath))
+                    {
+                        CompressionHelper.Decompress(compressedFileStream, decompressedFileStream);
+                    }
+                }
+                finally
+                {
+                    // Clean up temporary file
+                    if (File.Exists(tempFile))
+                    {
+                        File.Delete(tempFile);
+                    }
                 }
             }
-            
-            Console.WriteLine();
-            fileStream.Close();
+            else
+            {
+                // Receive and save file without decompression
+                using var fileStream = File.Create(savePath);
+                var buffer = new byte[8192];
+                var bytesRead = 0L;
+                var sw = Stopwatch.StartNew();
+                var lastUpdate = sw.ElapsedMilliseconds;
+                var lastBytes = 0L;
+                
+                while (bytesRead < originalSize)
+                {
+                    var chunkSize = (int)Math.Min(buffer.Length, originalSize - bytesRead);
+                    var read = stream.Read(buffer, 0, chunkSize);
+                    fileStream.Write(buffer, 0, read);
+                    bytesRead += read;
+                    
+                    var now = sw.ElapsedMilliseconds;
+                    if (now - lastUpdate >= 100)
+                    {
+                        var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                        FileOperations.DisplayProgress(bytesRead, originalSize, bytesPerSecond);
+                        lastUpdate = now;
+                        lastBytes = bytesRead;
+                    }
+                }
+                
+                Console.WriteLine();
+            }
             
             // Verify hash
             Console.Write("Verifying file hash... ");
@@ -183,8 +245,10 @@ public class FileTransferServer
     /// <param name="filename">The name of the file being received.</param>
     private void ReceiveFile(BinaryReader reader, NetworkStream stream, string filename)
     {
-        // Read filesize
-        var filesize = reader.ReadInt64();
+        // Read compression flag
+        var useCompression = reader.ReadBoolean();
+        // Read original filesize
+        var originalSize = reader.ReadInt64();
         // Read hash
         var sourceHash = reader.ReadString();
         
@@ -193,7 +257,8 @@ public class FileTransferServer
         
         // Create full save path
         var savePath = Path.Combine(_downloadsDirectory, filename);
-        Console.WriteLine($"Receiving file: {filename} ({filesize:N0} bytes)");
+        Console.WriteLine($"Receiving file: {filename} ({originalSize:N0} bytes)");
+        Console.WriteLine($"Compression: {(useCompression ? "Enabled" : "Disabled")}");
         Console.WriteLine($"Saving to: {savePath}");
         
         // Create directory if needed
@@ -203,33 +268,92 @@ public class FileTransferServer
             Directory.CreateDirectory(dir);
         }
         
-        // Receive and save file
-        using var fileStream = File.Create(savePath);
-        var buffer = new byte[8192];
-        var bytesRead = 0L;
-        var sw = Stopwatch.StartNew();
-        var lastUpdate = sw.ElapsedMilliseconds;
-        var lastBytes = 0L;
-        
-        while (bytesRead < filesize)
+        if (useCompression)
         {
-            var chunkSize = (int)Math.Min(buffer.Length, filesize - bytesRead);
-            var read = stream.Read(buffer, 0, chunkSize);
-            fileStream.Write(buffer, 0, read);
-            bytesRead += read;
+            // Read compressed size
+            var compressedSize = reader.ReadInt64();
+            var ratio = CompressionHelper.GetCompressionRatio(originalSize, compressedSize);
+            Console.WriteLine($"Compressed size: {compressedSize:N0} bytes ({ratio:F2}% reduction)");
             
-            var now = sw.ElapsedMilliseconds;
-            if (now - lastUpdate >= 100)
+            // Create a temporary file for compressed data
+            var tempFile = Path.GetTempFileName();
+            try
             {
-                var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                FileOperations.DisplayProgress(bytesRead, filesize, bytesPerSecond);
-                lastUpdate = now;
-                lastBytes = bytesRead;
+                // Receive compressed data to temporary file
+                using (var tempFileStream = File.Create(tempFile))
+                {
+                    var buffer = new byte[8192];
+                    var bytesRead = 0L;
+                    var sw = Stopwatch.StartNew();
+                    var lastUpdate = sw.ElapsedMilliseconds;
+                    var lastBytes = 0L;
+                    
+                    while (bytesRead < compressedSize)
+                    {
+                        var chunkSize = (int)Math.Min(buffer.Length, compressedSize - bytesRead);
+                        var read = stream.Read(buffer, 0, chunkSize);
+                        tempFileStream.Write(buffer, 0, read);
+                        bytesRead += read;
+                        
+                        var now = sw.ElapsedMilliseconds;
+                        if (now - lastUpdate >= 100)
+                        {
+                            var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                            FileOperations.DisplayProgress(bytesRead, compressedSize, bytesPerSecond);
+                            lastUpdate = now;
+                            lastBytes = bytesRead;
+                        }
+                    }
+                }
+                
+                Console.WriteLine();
+                Console.WriteLine("Decompressing data...");
+                
+                // Decompress data to final location
+                using (var compressedFileStream = File.OpenRead(tempFile))
+                using (var decompressedFileStream = File.Create(savePath))
+                {
+                    CompressionHelper.Decompress(compressedFileStream, decompressedFileStream);
+                }
+            }
+            finally
+            {
+                // Clean up temporary file
+                if (File.Exists(tempFile))
+                {
+                    File.Delete(tempFile);
+                }
             }
         }
-        
-        Console.WriteLine();
-        fileStream.Close();
+        else
+        {
+            // Receive and save file without decompression
+            using var fileStream = File.Create(savePath);
+            var buffer = new byte[8192];
+            var bytesRead = 0L;
+            var sw = Stopwatch.StartNew();
+            var lastUpdate = sw.ElapsedMilliseconds;
+            var lastBytes = 0L;
+            
+            while (bytesRead < originalSize)
+            {
+                var chunkSize = (int)Math.Min(buffer.Length, originalSize - bytesRead);
+                var read = stream.Read(buffer, 0, chunkSize);
+                fileStream.Write(buffer, 0, read);
+                bytesRead += read;
+                
+                var now = sw.ElapsedMilliseconds;
+                if (now - lastUpdate >= 100)
+                {
+                    var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                    FileOperations.DisplayProgress(bytesRead, originalSize, bytesPerSecond);
+                    lastUpdate = now;
+                    lastBytes = bytesRead;
+                }
+            }
+            
+            Console.WriteLine();
+        }
         
         // Verify hash
         Console.Write("Verifying file hash... ");

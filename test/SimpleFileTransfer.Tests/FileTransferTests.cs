@@ -194,4 +194,50 @@ public class FileTransferTests : IDisposable
         var client = new FileTransferClient("localhost");
         Assert.Throws<FileNotFoundException>(() => client.SendFile(nonExistentFile));
     }
+
+    [Fact]
+    public async Task CompressedFileTransfer_Success()
+    {
+        // Arrange
+        var content = new string('X', 1024 * 1024); // 1MB of data that should compress well
+        var testFile = CreateTestFile("compressed.txt", content);
+        await StartServer();
+
+        // Act
+        var client = new FileTransferClient("localhost", Program.Port, useCompression: true);
+        client.SendFile(testFile);
+        await Task.Delay(3000); // Give time for transfer to complete
+
+        // Assert
+        var downloadedFile = Path.Combine(_downloadDir, "compressed.txt");
+        Assert.True(File.Exists(downloadedFile));
+        Assert.Equal(content, File.ReadAllText(downloadedFile));
+    }
+
+    [Fact]
+    public async Task CompressedDirectoryTransfer_Success()
+    {
+        // Arrange
+        var files = new Dictionary<string, string>
+        {
+            { "compressible1.txt", new string('A', 10000) },
+            { "compressible2.txt", new string('B', 10000) },
+            { "subdir/compressible3.txt", new string('C', 10000) }
+        };
+        var testDir = CreateTestDirectory("compressed_dir", files);
+        await StartServer();
+
+        // Act
+        var client = new FileTransferClient("localhost", Program.Port, useCompression: true);
+        client.SendDirectory(testDir);
+        await Task.Delay(3000); // Give time for transfer to complete
+
+        // Assert
+        foreach (var (file, content) in files)
+        {
+            var downloadedFile = Path.Combine(_downloadDir, "compressed_dir", file);
+            Assert.True(File.Exists(downloadedFile), $"File should exist: {file}");
+            Assert.Equal(content, File.ReadAllText(downloadedFile));
+        }
+    }
 } 

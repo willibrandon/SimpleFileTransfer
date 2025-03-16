@@ -13,16 +13,19 @@ public class FileTransferClient
 {
     private readonly string _host;
     private readonly int _port;
+    private readonly bool _useCompression;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FileTransferClient"/> class.
     /// </summary>
     /// <param name="host">The hostname or IP address of the server to connect to.</param>
     /// <param name="port">The port number to connect to. Defaults to <see cref="Program.Port"/>.</param>
-    public FileTransferClient(string host, int port = Program.Port)
+    /// <param name="useCompression">Whether to use compression for file transfers. Defaults to false.</param>
+    public FileTransferClient(string host, int port = Program.Port, bool useCompression = false)
     {
         _host = host;
         _port = port;
+        _useCompression = useCompression;
     }
 
     /// <summary>
@@ -39,6 +42,7 @@ public class FileTransferClient
         
         var fileInfo = new FileInfo(filepath);
         Console.WriteLine($"Sending {fileInfo.Name} ({fileInfo.Length:N0} bytes) to {_host}");
+        Console.WriteLine($"Compression: {(_useCompression ? "Enabled" : "Disabled")}");
         
         // Calculate hash before sending
         Console.Write("Calculating file hash... ");
@@ -54,32 +58,95 @@ public class FileTransferClient
             
             // Send filename
             writer.Write(Path.GetFileName(filepath));
-            // Send filesize
+            // Send compression flag
+            writer.Write(_useCompression);
+            // Send original filesize
             writer.Write(fileInfo.Length);
             // Send hash
             writer.Write(hash);
             
             // Send file data
             using var fileStream = File.OpenRead(filepath);
-            var buffer = new byte[8192];
-            var bytesRead = 0L;
-            var sw = Stopwatch.StartNew();
-            var lastUpdate = sw.ElapsedMilliseconds;
-            var lastBytes = 0L;
-            int read;
             
-            while ((read = fileStream.Read(buffer, 0, buffer.Length)) > 0)
+            if (_useCompression)
             {
-                stream.Write(buffer, 0, read);
-                bytesRead += read;
+                Console.WriteLine("Compressing data...");
                 
-                var now = sw.ElapsedMilliseconds;
-                if (now - lastUpdate >= 100)
+                // Create a temporary file for compressed data
+                var tempFile = Path.GetTempFileName();
+                try
                 {
-                    var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                    FileOperations.DisplayProgress(bytesRead, fileInfo.Length, bytesPerSecond);
-                    lastUpdate = now;
-                    lastBytes = bytesRead;
+                    // Compress the file
+                    using (var compressedFileStream = File.Create(tempFile))
+                    {
+                        CompressionHelper.Compress(fileStream, compressedFileStream);
+                    }
+                    
+                    // Get compressed size
+                    var compressedInfo = new FileInfo(tempFile);
+                    var compressedSize = compressedInfo.Length;
+                    var ratio = CompressionHelper.GetCompressionRatio(fileInfo.Length, compressedSize);
+                    Console.WriteLine($"Compressed: {compressedSize:N0} bytes ({ratio:F2}% reduction)");
+                    
+                    // Send compressed size
+                    writer.Write(compressedSize);
+                    
+                    // Send compressed data
+                    using var compressedDataStream = File.OpenRead(tempFile);
+                    var buffer = new byte[8192];
+                    var bytesRead = 0L;
+                    var sw = Stopwatch.StartNew();
+                    var lastUpdate = sw.ElapsedMilliseconds;
+                    var lastBytes = 0L;
+                    int read;
+                    
+                    while ((read = compressedDataStream.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        stream.Write(buffer, 0, read);
+                        bytesRead += read;
+                        
+                        var now = sw.ElapsedMilliseconds;
+                        if (now - lastUpdate >= 100)
+                        {
+                            var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                            FileOperations.DisplayProgress(bytesRead, compressedSize, bytesPerSecond);
+                            lastUpdate = now;
+                            lastBytes = bytesRead;
+                        }
+                    }
+                }
+                finally
+                {
+                    // Clean up temporary file
+                    if (File.Exists(tempFile))
+                    {
+                        File.Delete(tempFile);
+                    }
+                }
+            }
+            else
+            {
+                // Send file data without compression
+                var buffer = new byte[8192];
+                var bytesRead = 0L;
+                var sw = Stopwatch.StartNew();
+                var lastUpdate = sw.ElapsedMilliseconds;
+                var lastBytes = 0L;
+                int read;
+                
+                while ((read = fileStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    stream.Write(buffer, 0, read);
+                    bytesRead += read;
+                    
+                    var now = sw.ElapsedMilliseconds;
+                    if (now - lastUpdate >= 100)
+                    {
+                        var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                        FileOperations.DisplayProgress(bytesRead, fileInfo.Length, bytesPerSecond);
+                        lastUpdate = now;
+                        lastBytes = bytesRead;
+                    }
                 }
             }
             
@@ -112,6 +179,7 @@ public class FileTransferClient
         Console.WriteLine($"Preparing to send directory: {dirPath}");
         Console.WriteLine($"Total files: {files.Length}");
         Console.WriteLine($"Total size: {totalSize:N0} bytes");
+        Console.WriteLine($"Compression: {(_useCompression ? "Enabled" : "Disabled")}");
         
         try
         {
@@ -122,6 +190,8 @@ public class FileTransferClient
             
             // Send marker indicating this is a directory
             writer.Write("DIR:");
+            // Send compression flag
+            writer.Write(_useCompression);
             // Send base directory name
             writer.Write(dirInfo.Name);
             // Send number of files
@@ -139,34 +209,96 @@ public class FileTransferClient
                 
                 // Send relative path
                 writer.Write(relativePath);
-                // Send filesize
+                // Send original filesize
                 writer.Write(fileInfo.Length);
                 // Send hash
                 writer.Write(hash);
                 
                 // Send file data
                 using var fileStream = File.OpenRead(file);
-                var buffer = new byte[8192];
-                var bytesRead = 0L;
-                var sw = Stopwatch.StartNew();
-                var lastUpdate = sw.ElapsedMilliseconds;
-                var lastBytes = 0L;
-                int read;
                 
-                while ((read = fileStream.Read(buffer, 0, buffer.Length)) > 0)
+                if (_useCompression)
                 {
-                    stream.Write(buffer, 0, read);
-                    bytesRead += read;
+                    Console.WriteLine("Compressing data...");
                     
-                    var now = sw.ElapsedMilliseconds;
-                    if (now - lastUpdate >= 100)
+                    // Create a temporary file for compressed data
+                    var tempFile = Path.GetTempFileName();
+                    try
                     {
-                        var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                        FileOperations.DisplayProgress(bytesRead, fileInfo.Length, bytesPerSecond);
-                        lastUpdate = now;
-                        lastBytes = bytesRead;
+                        // Compress the file
+                        using (var compressedFileStream = File.Create(tempFile))
+                        {
+                            CompressionHelper.Compress(fileStream, compressedFileStream);
+                        }
+                        
+                        // Get compressed size
+                        var compressedInfo = new FileInfo(tempFile);
+                        var compressedSize = compressedInfo.Length;
+                        var ratio = CompressionHelper.GetCompressionRatio(fileInfo.Length, compressedSize);
+                        Console.WriteLine($"Compressed: {compressedSize:N0} bytes ({ratio:F2}% reduction)");
+                        
+                        // Send compressed size
+                        writer.Write(compressedSize);
+                        
+                        // Send compressed data
+                        using var compressedDataStream = File.OpenRead(tempFile);
+                        var buffer = new byte[8192];
+                        var bytesRead = 0L;
+                        var sw = Stopwatch.StartNew();
+                        var lastUpdate = sw.ElapsedMilliseconds;
+                        var lastBytes = 0L;
+                        int read;
+                        
+                        while ((read = compressedDataStream.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            stream.Write(buffer, 0, read);
+                            bytesRead += read;
+                            
+                            var now = sw.ElapsedMilliseconds;
+                            if (now - lastUpdate >= 100)
+                            {
+                                var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                                FileOperations.DisplayProgress(bytesRead, compressedSize, bytesPerSecond);
+                                lastUpdate = now;
+                                lastBytes = bytesRead;
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        // Clean up temporary file
+                        if (File.Exists(tempFile))
+                        {
+                            File.Delete(tempFile);
+                        }
                     }
                 }
+                else
+                {
+                    // Send file data without compression
+                    var buffer = new byte[8192];
+                    var bytesRead = 0L;
+                    var sw = Stopwatch.StartNew();
+                    var lastUpdate = sw.ElapsedMilliseconds;
+                    var lastBytes = 0L;
+                    int read;
+                    
+                    while ((read = fileStream.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        stream.Write(buffer, 0, read);
+                        bytesRead += read;
+                        
+                        var now = sw.ElapsedMilliseconds;
+                        if (now - lastUpdate >= 100)
+                        {
+                            var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                            FileOperations.DisplayProgress(bytesRead, fileInfo.Length, bytesPerSecond);
+                            lastUpdate = now;
+                            lastBytes = bytesRead;
+                        }
+                    }
+                }
+                
                 Console.WriteLine();
             }
             

@@ -35,9 +35,7 @@ public class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage:");
-            Console.WriteLine("  receive - Start receiving files");
-            Console.WriteLine("  send <host> <path> - Send a file or directory");
+            DisplayUsage();
             return;
         }
 
@@ -46,10 +44,13 @@ public class Program
             var server = new FileTransferServer(DownloadsDirectory);
             server.Start(CancellationToken.None);
         }
-        else if (args[0] == "send" && args.Length == 3)
+        else if (args[0] == "send" && args.Length >= 3)
         {
-            var client = new FileTransferClient(args[1]);
+            var host = args[1];
             var path = args[2];
+            var useCompression = args.Length > 3 && args[3] == "--compress";
+            
+            var client = new FileTransferClient(host, Port, useCompression);
             
             if (Directory.Exists(path))
             {
@@ -64,5 +65,28 @@ public class Program
                 Console.WriteLine($"Error: Path not found: {path}");
             }
         }
+        else
+        {
+            DisplayUsage();
+        }
+    }
+    
+    /// <summary>
+    /// Displays usage information for the application.
+    /// </summary>
+    private static void DisplayUsage()
+    {
+        Console.WriteLine("SimpleFileTransfer - A simple file transfer utility");
+        Console.WriteLine();
+        Console.WriteLine("Usage:");
+        Console.WriteLine("  receive                      - Start receiving files");
+        Console.WriteLine("  send <host> <path>           - Send a file or directory");
+        Console.WriteLine("  send <host> <path> --compress - Send a file or directory with compression");
+        Console.WriteLine();
+        Console.WriteLine("Examples:");
+        Console.WriteLine("  SimpleFileTransfer receive");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --compress");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfolder --compress");
     }
 }
