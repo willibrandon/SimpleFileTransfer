@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace SimpleFileTransfer.Tests;
 
@@ -16,6 +10,7 @@ public class FileTransferTests : IDisposable
     private Task? _serverTask;
     private CancellationTokenSource? _serverCts;
     private const string TestPassword = "testpassword123";
+    private static int _portCounter = 9876;
 
     public FileTransferTests()
     {
@@ -35,8 +30,11 @@ public class FileTransferTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private async Task StartServer(string? password = null)
+    private async Task<int> StartServer(string? password = null)
     {
+        // Use a different port for each test
+        int port = Interlocked.Increment(ref _portCounter);
+        
         _serverCts = new CancellationTokenSource();
         _serverTask = Task.Run(() =>
         {
@@ -47,8 +45,8 @@ public class FileTransferTests : IDisposable
 
             try
             {
-                var server = new FileTransferServer(_downloadDir, Program.Port, password);
-                server.Start(_serverCts.Token);
+                var server = new FileTransferServer(_downloadDir, port, password, _serverCts.Token);
+                server.Start();
             }
             catch (OperationCanceledException)
             {
@@ -62,12 +60,33 @@ public class FileTransferTests : IDisposable
 
         // Give the server a moment to start
         await Task.Delay(100);
+        
+        return port;
     }
 
     private string CreateTestFile(string filename, string content)
     {
         var path = Path.Combine(_testDir, filename);
         File.WriteAllText(path, content);
+        return path;
+    }
+
+    private string CreateLargeTestFile(string filename, long sizeInBytes)
+    {
+        var path = Path.Combine(_testDir, filename);
+        using (var fileStream = new FileStream(path, FileMode.Create, FileAccess.Write))
+        {
+            var buffer = new byte[8192];
+            new Random(42).NextBytes(buffer); // Use a fixed seed for reproducibility
+            
+            long bytesWritten = 0;
+            while (bytesWritten < sizeInBytes)
+            {
+                int bytesToWrite = (int)Math.Min(buffer.Length, sizeInBytes - bytesWritten);
+                fileStream.Write(buffer, 0, bytesToWrite);
+                bytesWritten += bytesToWrite;
+            }
+        }
         return path;
     }
 
@@ -97,16 +116,24 @@ public class FileTransferTests : IDisposable
         return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
     }
 
+    private string CalculateFileHash(string filepath)
+    {
+        using var sha256 = SHA256.Create();
+        using var stream = File.OpenRead(filepath);
+        var hash = sha256.ComputeHash(stream);
+        return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+    }
+
     [Fact]
     public async Task SingleFileTransfer_Success()
     {
         // Arrange
         var content = "Hello, World!";
         var testFile = CreateTestFile("test.txt", content);
-        await StartServer();
+        var port = await StartServer();
 
         // Act
-        var client = new FileTransferClient("localhost");
+        var client = new FileTransferClient("localhost", port);
         client.SendFile(testFile);
         await Task.Delay(1000); // Give time for transfer to complete
 
@@ -127,10 +154,10 @@ public class FileTransferTests : IDisposable
             { "subdir/deeper/file3.txt", "Content 3" }
         };
         var testDir = CreateTestDirectory("testdir", files);
-        await StartServer();
+        var port = await StartServer();
 
         // Act
-        var client = new FileTransferClient("localhost");
+        var client = new FileTransferClient("localhost", port);
         client.SendDirectory(testDir);
         await Task.Delay(2000); // Give time for transfer to complete
 
@@ -149,10 +176,10 @@ public class FileTransferTests : IDisposable
         // Arrange
         var content = new string('X', 1024 * 1024); // 1MB of data
         var testFile = CreateTestFile("large.txt", content);
-        await StartServer();
+        var port = await StartServer();
 
         // Act
-        var client = new FileTransferClient("localhost");
+        var client = new FileTransferClient("localhost", port);
         client.SendFile(testFile);
         await Task.Delay(2000); // Give more time for large file
 
@@ -169,10 +196,10 @@ public class FileTransferTests : IDisposable
         var content = "Test content for hash verification";
         var testFile = CreateTestFile("hash_test.txt", content);
         var expectedHash = CalculateHash(content);
-        await StartServer();
+        var port = await StartServer();
 
         // Act
-        var client = new FileTransferClient("localhost");
+        var client = new FileTransferClient("localhost", port);
         client.SendFile(testFile);
         await Task.Delay(1000);
 
@@ -188,11 +215,11 @@ public class FileTransferTests : IDisposable
     public async Task NonExistentFile_ThrowsError()
     {
         // Arrange
-        await StartServer();
+        var port = await StartServer();
 
         // Act & Assert
         var nonExistentFile = Path.Combine(_testDir, "nonexistent.txt");
-        var client = new FileTransferClient("localhost");
+        var client = new FileTransferClient("localhost", port);
         Assert.Throws<FileNotFoundException>(() => client.SendFile(nonExistentFile));
     }
 
@@ -204,10 +231,10 @@ public class FileTransferTests : IDisposable
         // Arrange
         var content = new string('X', 1024 * 1024); // 1MB of data that should compress well
         var testFile = CreateTestFile($"compressed_{algorithm}.txt", content);
-        await StartServer();
+        var port = await StartServer();
 
         // Act
-        var client = new FileTransferClient("localhost", Program.Port, useCompression: true, algorithm);
+        var client = new FileTransferClient("localhost", port, useCompression: true, algorithm);
         client.SendFile(testFile);
         await Task.Delay(3000); // Give time for transfer to complete
 
@@ -230,10 +257,10 @@ public class FileTransferTests : IDisposable
             { "subdir/compressible3.txt", new string('C', 10000) }
         };
         var testDir = CreateTestDirectory($"compressed_dir_{algorithm}", files);
-        await StartServer();
+        var port = await StartServer();
 
         // Act
-        var client = new FileTransferClient("localhost", Program.Port, useCompression: true, algorithm);
+        var client = new FileTransferClient("localhost", port, useCompression: true, algorithm);
         client.SendDirectory(testDir);
         await Task.Delay(3000); // Give time for transfer to complete
 
@@ -252,12 +279,12 @@ public class FileTransferTests : IDisposable
         // Arrange
         var content = "This is a test of encrypted file transfer.";
         var testFile = CreateTestFile("encrypted.txt", content);
-        await StartServer(TestPassword);
+        var port = await StartServer(TestPassword);
 
         // Act
         var client = new FileTransferClient(
             "localhost", 
-            Program.Port, 
+            port, 
             useCompression: false, 
             CompressionHelper.CompressionAlgorithm.GZip,
             useEncryption: true,
@@ -278,12 +305,12 @@ public class FileTransferTests : IDisposable
         // Arrange
         var content = new string('X', 1024 * 1024); // 1MB of data that should compress well
         var testFile = CreateTestFile("encrypted_compressed.txt", content);
-        await StartServer(TestPassword);
+        var port = await StartServer(TestPassword);
 
         // Act
         var client = new FileTransferClient(
             "localhost", 
-            Program.Port, 
+            port, 
             useCompression: true, 
             CompressionHelper.CompressionAlgorithm.GZip,
             useEncryption: true,
@@ -309,12 +336,12 @@ public class FileTransferTests : IDisposable
             { "subdir/deeper/file3.txt", "Content 3" }
         };
         var testDir = CreateTestDirectory("encrypted_dir", files);
-        await StartServer(TestPassword);
+        var port = await StartServer(TestPassword);
 
         // Act
         var client = new FileTransferClient(
             "localhost", 
-            Program.Port, 
+            port, 
             useCompression: false, 
             CompressionHelper.CompressionAlgorithm.GZip,
             useEncryption: true,
@@ -338,12 +365,12 @@ public class FileTransferTests : IDisposable
         // Arrange
         var content = "This is a test of encrypted file transfer with wrong password.";
         var testFile = CreateTestFile("encrypted_wrong_password.txt", content);
-        await StartServer("wrongpassword");
+        var port = await StartServer("wrongpassword");
 
         // Act
         var client = new FileTransferClient(
             "localhost", 
-            Program.Port, 
+            port, 
             useCompression: false, 
             CompressionHelper.CompressionAlgorithm.GZip,
             useEncryption: true,
@@ -369,4 +396,68 @@ public class FileTransferTests : IDisposable
             Assert.True(true);
         }
     }
-} 
+
+    [Fact]
+    public void TransferResumeManager_BasicFunctionality()
+    {
+        // Arrange
+        var testFilePath = Path.Combine(_testDir, "resume_test.dat");
+        File.WriteAllText(testFilePath, "Test content");
+        
+        var resumeInfo = new TransferResumeManager.ResumeInfo
+        {
+            FilePath = testFilePath,
+            FileName = Path.GetFileName(testFilePath),
+            TotalSize = 100,
+            BytesTransferred = 50,
+            Hash = "testhash",
+            UseCompression = true,
+            CompressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip,
+            UseEncryption = true,
+            Host = "localhost",
+            Port = 9876,
+            RelativePath = "",
+            DirectoryName = ""
+        };
+        
+        try
+        {
+            // Act - Create a resume file
+            TransferResumeManager.CreateResumeFile(resumeInfo);
+            
+            // Assert - Verify the resume file was created
+            var loadedInfo = TransferResumeManager.LoadResumeInfo(testFilePath);
+            Assert.NotNull(loadedInfo);
+            Assert.Equal(resumeInfo.FileName, loadedInfo.FileName);
+            Assert.Equal(resumeInfo.TotalSize, loadedInfo.TotalSize);
+            Assert.Equal(resumeInfo.BytesTransferred, loadedInfo.BytesTransferred);
+            
+            // Act - Update the resume file
+            resumeInfo.BytesTransferred = 75;
+            TransferResumeManager.UpdateResumeFile(resumeInfo);
+            
+            // Assert - Verify the resume file was updated
+            loadedInfo = TransferResumeManager.LoadResumeInfo(testFilePath);
+            Assert.NotNull(loadedInfo);
+            Assert.Equal(75, loadedInfo.BytesTransferred);
+            
+            // Act - Get all resume files
+            var allResumeFiles = TransferResumeManager.GetAllResumeFiles();
+            
+            // Assert - Verify our resume file is in the list
+            Assert.Contains(allResumeFiles, r => r.FilePath == testFilePath);
+            
+            // Act - Delete the resume file
+            TransferResumeManager.DeleteResumeFile(testFilePath);
+            
+            // Assert - Verify the resume file was deleted
+            loadedInfo = TransferResumeManager.LoadResumeInfo(testFilePath);
+            Assert.Null(loadedInfo);
+        }
+        finally
+        {
+            // Cleanup
+            TransferResumeManager.DeleteResumeFile(testFilePath);
+        }
+    }
+}

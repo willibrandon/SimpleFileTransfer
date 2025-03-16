@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -16,6 +17,9 @@ public class FileTransferServer
     private readonly int _port;
     private readonly string _downloadsDirectory;
     private readonly string? _password;
+    private bool _isRunning;
+    private TcpListener? _listener;
+    private readonly CancellationToken _cancellationToken;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FileTransferServer"/> class.
@@ -23,22 +27,33 @@ public class FileTransferServer
     /// <param name="downloadsDirectory">The directory where received files will be saved.</param>
     /// <param name="port">The port number to listen on. Defaults to <see cref="Program.Port"/>.</param>
     /// <param name="password">The password to use for decryption. Required if receiving encrypted files.</param>
-    public FileTransferServer(string downloadsDirectory, int port = Program.Port, string? password = null)
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    public FileTransferServer(
+        string downloadsDirectory, 
+        int port = Program.Port, 
+        string? password = null,
+        CancellationToken cancellationToken = default)
     {
         _port = port;
         _downloadsDirectory = downloadsDirectory;
         _password = password;
+        _cancellationToken = cancellationToken;
         Directory.CreateDirectory(_downloadsDirectory);
     }
 
     /// <summary>
     /// Starts the file transfer server and listens for incoming connections.
     /// </summary>
-    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-    public void Start(CancellationToken cancellationToken = default)
+    public void Start()
     {
-        var listener = new TcpListener(IPAddress.Any, _port);
-        listener.Start();
+        if (_isRunning)
+        {
+            return;
+        }
+
+        _isRunning = true;
+        _listener = new TcpListener(IPAddress.Any, _port);
+        _listener.Start();
         
         var hostName = Dns.GetHostName();
         var addresses = Dns.GetHostAddresses(hostName)
@@ -53,19 +68,61 @@ public class FileTransferServer
         }
         Console.WriteLine("Ctrl+C to exit");
         
+        Thread.Sleep(100); // Give the console a moment to display the message
+        
+        // Start accepting clients in a background thread
+        ThreadPool.QueueUserWorkItem(_ => AcceptClients());
+    }
+
+    /// <summary>
+    /// Stops the file transfer server.
+    /// </summary>
+    public void Stop()
+    {
+        _isRunning = false;
+        _listener?.Stop();
+        Console.WriteLine("Server stopped");
+    }
+
+    private void AcceptClients()
+    {
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
+            while (_isRunning && !_cancellationToken.IsCancellationRequested)
             {
-                if (!listener.Pending())
+                if (!_listener!.Pending())
                 {
                     Thread.Sleep(100);  // Don't busy-wait
                     continue;
                 }
 
-                var client = listener.AcceptTcpClient();
+                var client = _listener.AcceptTcpClient();
                 Console.WriteLine($"\nClient connected from {client.Client.RemoteEndPoint}");
                 
+                // Handle client in a separate thread
+                ThreadPool.QueueUserWorkItem(_ => HandleClient(client));
+            }
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.Interrupted || ex.SocketErrorCode == SocketError.OperationAborted)
+        {
+            // Server was stopped, this is expected
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error accepting client: {ex.Message}");
+        }
+        finally
+        {
+            _listener?.Stop();
+        }
+    }
+
+    private void HandleClient(TcpClient client)
+    {
+        try
+        {
+            using (client)
+            {
                 using var stream = client.GetStream();
                 using var reader = new BinaryReader(stream);
                 
@@ -81,13 +138,11 @@ public class FileTransferServer
                     // It's a single file transfer, firstString is the filename
                     ReceiveFile(reader, stream, firstString);
                 }
-                
-                client.Close();
             }
         }
-        finally
+        catch (Exception ex)
         {
-            listener.Stop();
+            Console.WriteLine($"Error handling client: {ex.Message}");
         }
     }
 
@@ -102,6 +157,8 @@ public class FileTransferServer
         var useCompression = reader.ReadBoolean();
         // Read encryption flag
         var useEncryption = reader.ReadBoolean();
+        // Read resume flag
+        var resumeEnabled = reader.ReadBoolean();
         
         // Read compression algorithm if compression is enabled
         var compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip;
@@ -127,6 +184,7 @@ public class FileTransferServer
         Console.WriteLine($"Total files: {fileCount}");
         Console.WriteLine($"Compression: {(useCompression ? $"Enabled ({compressionAlgorithm})" : "Disabled")}");
         Console.WriteLine($"Encryption: {(useEncryption ? "Enabled" : "Disabled")}");
+        Console.WriteLine($"Resume capability: {(resumeEnabled ? "Enabled" : "Disabled")}");
         
         // Create downloads directory
         var downloadsDir = Path.Combine(_downloadsDirectory, dirName);
@@ -140,10 +198,20 @@ public class FileTransferServer
             var originalSize = reader.ReadInt64();
             // Read hash
             var sourceHash = reader.ReadString();
+            // Read resume position
+            var resumePosition = reader.ReadInt64();
             // Read processed size
             var processedSize = reader.ReadInt64();
+            // Read processed resume position
+            var processedResumePosition = reader.ReadInt64();
             
             Console.WriteLine($"\nReceiving file {i + 1}/{fileCount}: {relativePath}");
+            
+            if (resumeEnabled && resumePosition > 0)
+            {
+                Console.WriteLine($"Resuming from position {resumePosition:N0} bytes ({(double)resumePosition * 100 / originalSize:F2}%)");
+                Console.WriteLine($"Processed resume position: {processedResumePosition:N0} bytes ({(double)processedResumePosition * 100 / processedSize:F2}%)");
+            }
             
             // Create full save path
             var savePath = Path.Combine(downloadsDir, relativePath);
@@ -160,14 +228,24 @@ public class FileTransferServer
             var tempFile = Path.GetTempFileName();
             try
             {
+                // If resuming and the file exists, copy the existing file to the temp file
+                if (resumeEnabled && resumePosition > 0 && File.Exists(savePath))
+                {
+                    using (var existingFile = File.OpenRead(savePath))
+                    using (var tempFileStream = File.Create(tempFile))
+                    {
+                        existingFile.CopyTo(tempFileStream);
+                    }
+                }
+                
                 // Receive processed data to temporary file
-                using (var tempFileStream = File.Create(tempFile))
+                using (var tempFileStream = new FileStream(tempFile, FileMode.Append))
                 {
                     var buffer = new byte[8192];
-                    var bytesRead = 0L;
+                    var bytesRead = processedResumePosition;
                     var sw = Stopwatch.StartNew();
                     var lastUpdate = sw.ElapsedMilliseconds;
-                    var lastBytes = 0L;
+                    var lastBytes = bytesRead;
                     
                     while (bytesRead < processedSize)
                     {
@@ -241,9 +319,24 @@ public class FileTransferServer
                         {
                             Console.WriteLine($"Decompressing data using {compressionAlgorithm}...");
                             
-                            using (var decompressedStream = File.Create(processedTempFile))
+                            try
                             {
-                                CompressionHelper.Decompress(sourceStream, decompressedStream, compressionAlgorithm);
+                                using (var decompressedStream = File.Create(processedTempFile))
+                                {
+                                    CompressionHelper.Decompress(sourceStream, decompressedStream, compressionAlgorithm);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Warning: Decompression failed: {ex.Message}");
+                                Console.WriteLine("The file may be corrupted.");
+                                
+                                // If decompression fails, just copy the source data
+                                sourceStream.Position = 0;
+                                using (var destStream = File.Create(processedTempFile))
+                                {
+                                    sourceStream.CopyTo(destStream);
+                                }
                             }
                         }
                         else
@@ -266,7 +359,14 @@ public class FileTransferServer
                         // Clean up temporary file
                         if (File.Exists(processedTempFile))
                         {
-                            File.Delete(processedTempFile);
+                            try
+                            {
+                                File.Delete(processedTempFile);
+                            }
+                            catch (IOException)
+                            {
+                                // Ignore file access errors during cleanup
+                            }
                         }
                     }
                 }
@@ -281,7 +381,14 @@ public class FileTransferServer
                 // Clean up temporary file
                 if (File.Exists(tempFile))
                 {
-                    File.Delete(tempFile);
+                    try
+                    {
+                        File.Delete(tempFile);
+                    }
+                    catch (IOException)
+                    {
+                        // Ignore file access errors during cleanup
+                    }
                 }
             }
             
@@ -319,6 +426,9 @@ public class FileTransferServer
         var originalSize = reader.ReadInt64();
         // Read hash
         var sourceHash = reader.ReadString();
+        // Read resume flag and position
+        var resumeEnabled = reader.ReadBoolean();
+        var resumePosition = reader.ReadInt64();
         
         // Check if we have a password for decryption
         if (useEncryption && string.IsNullOrEmpty(_password))
@@ -343,7 +453,13 @@ public class FileTransferServer
         Console.WriteLine($"Receiving file: {filename} ({originalSize:N0} bytes)");
         Console.WriteLine($"Compression: {(useCompression ? $"Enabled ({compressionAlgorithm})" : "Disabled")}");
         Console.WriteLine($"Encryption: {(useEncryption ? "Enabled" : "Disabled")}");
+        Console.WriteLine($"Resume capability: {(resumeEnabled ? "Enabled" : "Disabled")}");
         Console.WriteLine($"Saving to: {savePath}");
+        
+        if (resumeEnabled && resumePosition > 0)
+        {
+            Console.WriteLine($"Resuming from position {resumePosition:N0} bytes ({(double)resumePosition * 100 / originalSize:F2}%)");
+        }
         
         // Create directory if needed
         var dir = Path.GetDirectoryName(savePath);
@@ -354,19 +470,36 @@ public class FileTransferServer
         
         // Read processed size
         var processedSize = reader.ReadInt64();
+        // Read processed resume position
+        var processedResumePosition = reader.ReadInt64();
+        
+        if (resumeEnabled && processedResumePosition > 0)
+        {
+            Console.WriteLine($"Processed resume position: {processedResumePosition:N0} bytes ({(double)processedResumePosition * 100 / processedSize:F2}%)");
+        }
         
         // Create a temporary file for processed data
         var tempFile = Path.GetTempFileName();
         try
         {
+            // If resuming and the file exists, copy the existing file to the temp file
+            if (resumeEnabled && resumePosition > 0 && File.Exists(savePath))
+            {
+                using (var existingFile = File.OpenRead(savePath))
+                using (var tempFileStream = File.Create(tempFile))
+                {
+                    existingFile.CopyTo(tempFileStream);
+                }
+            }
+            
             // Receive processed data to temporary file
-            using (var tempFileStream = File.Create(tempFile))
+            using (var tempFileStream = new FileStream(tempFile, FileMode.Append))
             {
                 var buffer = new byte[8192];
-                var bytesRead = 0L;
+                var bytesRead = processedResumePosition;
                 var sw = Stopwatch.StartNew();
                 var lastUpdate = sw.ElapsedMilliseconds;
-                var lastBytes = 0L;
+                var lastBytes = bytesRead;
                 
                 while (bytesRead < processedSize)
                 {
@@ -440,9 +573,24 @@ public class FileTransferServer
                     {
                         Console.WriteLine($"Decompressing data using {compressionAlgorithm}...");
                         
-                        using (var decompressedStream = File.Create(processedTempFile))
+                        try
                         {
-                            CompressionHelper.Decompress(sourceStream, decompressedStream, compressionAlgorithm);
+                            using (var decompressedStream = File.Create(processedTempFile))
+                            {
+                                CompressionHelper.Decompress(sourceStream, decompressedStream, compressionAlgorithm);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Warning: Decompression failed: {ex.Message}");
+                            Console.WriteLine("The file may be corrupted.");
+                            
+                            // If decompression fails, just copy the source data
+                            sourceStream.Position = 0;
+                            using (var destStream = File.Create(processedTempFile))
+                            {
+                                sourceStream.CopyTo(destStream);
+                            }
                         }
                     }
                     else
@@ -465,7 +613,14 @@ public class FileTransferServer
                     // Clean up temporary file
                     if (File.Exists(processedTempFile))
                     {
-                        File.Delete(processedTempFile);
+                        try
+                        {
+                            File.Delete(processedTempFile);
+                        }
+                        catch (IOException)
+                        {
+                            // Ignore file access errors during cleanup
+                        }
                     }
                 }
             }
@@ -480,7 +635,14 @@ public class FileTransferServer
             // Clean up temporary file
             if (File.Exists(tempFile))
             {
-                File.Delete(tempFile);
+                try
+                {
+                    File.Delete(tempFile);
+                }
+                catch (IOException)
+                {
+                    // Ignore file access errors during cleanup
+                }
             }
         }
         
