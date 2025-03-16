@@ -15,16 +15,19 @@ public class FileTransferServer
 {
     private readonly int _port;
     private readonly string _downloadsDirectory;
+    private readonly string? _password;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FileTransferServer"/> class.
     /// </summary>
     /// <param name="downloadsDirectory">The directory where received files will be saved.</param>
     /// <param name="port">The port number to listen on. Defaults to <see cref="Program.Port"/>.</param>
-    public FileTransferServer(string downloadsDirectory, int port = Program.Port)
+    /// <param name="password">The password to use for decryption. Required if receiving encrypted files.</param>
+    public FileTransferServer(string downloadsDirectory, int port = Program.Port, string? password = null)
     {
         _port = port;
         _downloadsDirectory = downloadsDirectory;
+        _password = password;
         Directory.CreateDirectory(_downloadsDirectory);
     }
 
@@ -97,12 +100,22 @@ public class FileTransferServer
     {
         // Read compression flag
         var useCompression = reader.ReadBoolean();
+        // Read encryption flag
+        var useEncryption = reader.ReadBoolean();
         
         // Read compression algorithm if compression is enabled
         var compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip;
         if (useCompression)
         {
             compressionAlgorithm = (CompressionHelper.CompressionAlgorithm)reader.ReadInt32();
+        }
+        
+        // Check if we have a password for decryption
+        if (useEncryption && string.IsNullOrEmpty(_password))
+        {
+            Console.WriteLine("Error: Received encrypted data but no password was provided.");
+            Console.WriteLine("Please restart the server with a password using the --password option.");
+            return;
         }
         
         // Read base directory name
@@ -113,6 +126,7 @@ public class FileTransferServer
         Console.WriteLine($"Receiving directory: {dirName}");
         Console.WriteLine($"Total files: {fileCount}");
         Console.WriteLine($"Compression: {(useCompression ? $"Enabled ({compressionAlgorithm})" : "Disabled")}");
+        Console.WriteLine($"Encryption: {(useEncryption ? "Enabled" : "Disabled")}");
         
         // Create downloads directory
         var downloadsDir = Path.Combine(_downloadsDirectory, dirName);
@@ -126,6 +140,8 @@ public class FileTransferServer
             var originalSize = reader.ReadInt64();
             // Read hash
             var sourceHash = reader.ReadString();
+            // Read processed size
+            var processedSize = reader.ReadInt64();
             
             Console.WriteLine($"\nReceiving file {i + 1}/{fileCount}: {relativePath}");
             
@@ -140,91 +156,133 @@ public class FileTransferServer
                 Directory.CreateDirectory(dir);
             }
             
-            if (useCompression)
+            // Create a temporary file for processed data
+            var tempFile = Path.GetTempFileName();
+            try
             {
-                // Read compressed size
-                var compressedSize = reader.ReadInt64();
-                var ratio = CompressionHelper.GetCompressionRatio(originalSize, compressedSize);
-                Console.WriteLine($"Compressed size: {compressedSize:N0} bytes ({ratio:F2}% reduction)");
-                
-                // Create a temporary file for compressed data
-                var tempFile = Path.GetTempFileName();
-                try
+                // Receive processed data to temporary file
+                using (var tempFileStream = File.Create(tempFile))
                 {
-                    // Receive compressed data to temporary file
-                    using (var tempFileStream = File.Create(tempFile))
+                    var buffer = new byte[8192];
+                    var bytesRead = 0L;
+                    var sw = Stopwatch.StartNew();
+                    var lastUpdate = sw.ElapsedMilliseconds;
+                    var lastBytes = 0L;
+                    
+                    while (bytesRead < processedSize)
                     {
-                        var buffer = new byte[8192];
-                        var bytesRead = 0L;
-                        var sw = Stopwatch.StartNew();
-                        var lastUpdate = sw.ElapsedMilliseconds;
-                        var lastBytes = 0L;
+                        var chunkSize = (int)Math.Min(buffer.Length, processedSize - bytesRead);
+                        var read = stream.Read(buffer, 0, chunkSize);
+                        tempFileStream.Write(buffer, 0, read);
+                        bytesRead += read;
                         
-                        while (bytesRead < compressedSize)
+                        var now = sw.ElapsedMilliseconds;
+                        if (now - lastUpdate >= 100)
                         {
-                            var chunkSize = (int)Math.Min(buffer.Length, compressedSize - bytesRead);
-                            var read = stream.Read(buffer, 0, chunkSize);
-                            tempFileStream.Write(buffer, 0, read);
-                            bytesRead += read;
-                            
-                            var now = sw.ElapsedMilliseconds;
-                            if (now - lastUpdate >= 100)
-                            {
-                                var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                                FileOperations.DisplayProgress(bytesRead, compressedSize, bytesPerSecond);
-                                lastUpdate = now;
-                                lastBytes = bytesRead;
-                            }
+                            var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                            FileOperations.DisplayProgress(bytesRead, processedSize, bytesPerSecond);
+                            lastUpdate = now;
+                            lastBytes = bytesRead;
                         }
-                    }
-                    
-                    Console.WriteLine();
-                    Console.WriteLine($"Decompressing data using {compressionAlgorithm}...");
-                    
-                    // Decompress data to final location
-                    using (var compressedFileStream = File.OpenRead(tempFile))
-                    using (var decompressedFileStream = File.Create(savePath))
-                    {
-                        CompressionHelper.Decompress(compressedFileStream, decompressedFileStream, compressionAlgorithm);
-                    }
-                }
-                finally
-                {
-                    // Clean up temporary file
-                    if (File.Exists(tempFile))
-                    {
-                        File.Delete(tempFile);
-                    }
-                }
-            }
-            else
-            {
-                // Receive and save file without decompression
-                using var fileStream = File.Create(savePath);
-                var buffer = new byte[8192];
-                var bytesRead = 0L;
-                var sw = Stopwatch.StartNew();
-                var lastUpdate = sw.ElapsedMilliseconds;
-                var lastBytes = 0L;
-                
-                while (bytesRead < originalSize)
-                {
-                    var chunkSize = (int)Math.Min(buffer.Length, originalSize - bytesRead);
-                    var read = stream.Read(buffer, 0, chunkSize);
-                    fileStream.Write(buffer, 0, read);
-                    bytesRead += read;
-                    
-                    var now = sw.ElapsedMilliseconds;
-                    if (now - lastUpdate >= 100)
-                    {
-                        var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                        FileOperations.DisplayProgress(bytesRead, originalSize, bytesPerSecond);
-                        lastUpdate = now;
-                        lastBytes = bytesRead;
                     }
                 }
                 
                 Console.WriteLine();
+                
+                // Process the received data (decrypt and/or decompress)
+                if (useEncryption || useCompression)
+                {
+                    var processedTempFile = Path.GetTempFileName();
+                    try
+                    {
+                        var sourceStream = File.OpenRead(tempFile);
+                        
+                        // Decrypt if needed
+                        if (useEncryption)
+                        {
+                            Console.WriteLine("Decrypting data...");
+                            
+                            var decryptedTempFile = Path.GetTempFileName();
+                            try
+                            {
+                                using (var decryptedStream = File.Create(decryptedTempFile))
+                                {
+                                    bool decryptionSuccess = EncryptionHelper.Decrypt(sourceStream, decryptedStream, _password!);
+                                    
+                                    if (!decryptionSuccess)
+                                    {
+                                        Console.WriteLine("Warning: Decryption failed. File may be corrupted.");
+                                        // Continue with the encrypted data, hash verification will likely fail
+                                    }
+                                }
+                                
+                                sourceStream.Dispose();
+                                sourceStream = File.OpenRead(decryptedTempFile);
+                            }
+                            finally
+                            {
+                                // Clean up temporary file
+                                if (File.Exists(decryptedTempFile) && decryptedTempFile != processedTempFile)
+                                {
+                                    try
+                                    {
+                                        File.Delete(decryptedTempFile);
+                                    }
+                                    catch (IOException)
+                                    {
+                                        // Ignore file access errors during cleanup
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Decompress if needed
+                        if (useCompression)
+                        {
+                            Console.WriteLine($"Decompressing data using {compressionAlgorithm}...");
+                            
+                            using (var decompressedStream = File.Create(processedTempFile))
+                            {
+                                CompressionHelper.Decompress(sourceStream, decompressedStream, compressionAlgorithm);
+                            }
+                        }
+                        else
+                        {
+                            // Just copy the data if no decompression needed
+                            using (var destStream = File.Create(processedTempFile))
+                            {
+                                sourceStream.CopyTo(destStream);
+                            }
+                        }
+                        
+                        // Close the source stream
+                        sourceStream.Dispose();
+                        
+                        // Copy the processed file to the final location
+                        File.Copy(processedTempFile, savePath, true);
+                    }
+                    finally
+                    {
+                        // Clean up temporary file
+                        if (File.Exists(processedTempFile))
+                        {
+                            File.Delete(processedTempFile);
+                        }
+                    }
+                }
+                else
+                {
+                    // No processing needed, just copy the file
+                    File.Copy(tempFile, savePath, true);
+                }
+            }
+            finally
+            {
+                // Clean up temporary file
+                if (File.Exists(tempFile))
+                {
+                    File.Delete(tempFile);
+                }
             }
             
             // Verify hash
@@ -255,10 +313,20 @@ public class FileTransferServer
     {
         // Read compression flag
         var useCompression = reader.ReadBoolean();
+        // Read encryption flag
+        var useEncryption = reader.ReadBoolean();
         // Read original filesize
         var originalSize = reader.ReadInt64();
         // Read hash
         var sourceHash = reader.ReadString();
+        
+        // Check if we have a password for decryption
+        if (useEncryption && string.IsNullOrEmpty(_password))
+        {
+            Console.WriteLine("Error: Received encrypted data but no password was provided.");
+            Console.WriteLine("Please restart the server with a password using the --password option.");
+            return;
+        }
         
         // Read compression algorithm if compression is enabled
         var compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip;
@@ -274,6 +342,7 @@ public class FileTransferServer
         var savePath = Path.Combine(_downloadsDirectory, filename);
         Console.WriteLine($"Receiving file: {filename} ({originalSize:N0} bytes)");
         Console.WriteLine($"Compression: {(useCompression ? $"Enabled ({compressionAlgorithm})" : "Disabled")}");
+        Console.WriteLine($"Encryption: {(useEncryption ? "Enabled" : "Disabled")}");
         Console.WriteLine($"Saving to: {savePath}");
         
         // Create directory if needed
@@ -283,91 +352,136 @@ public class FileTransferServer
             Directory.CreateDirectory(dir);
         }
         
-        if (useCompression)
+        // Read processed size
+        var processedSize = reader.ReadInt64();
+        
+        // Create a temporary file for processed data
+        var tempFile = Path.GetTempFileName();
+        try
         {
-            // Read compressed size
-            var compressedSize = reader.ReadInt64();
-            var ratio = CompressionHelper.GetCompressionRatio(originalSize, compressedSize);
-            Console.WriteLine($"Compressed size: {compressedSize:N0} bytes ({ratio:F2}% reduction)");
-            
-            // Create a temporary file for compressed data
-            var tempFile = Path.GetTempFileName();
-            try
+            // Receive processed data to temporary file
+            using (var tempFileStream = File.Create(tempFile))
             {
-                // Receive compressed data to temporary file
-                using (var tempFileStream = File.Create(tempFile))
+                var buffer = new byte[8192];
+                var bytesRead = 0L;
+                var sw = Stopwatch.StartNew();
+                var lastUpdate = sw.ElapsedMilliseconds;
+                var lastBytes = 0L;
+                
+                while (bytesRead < processedSize)
                 {
-                    var buffer = new byte[8192];
-                    var bytesRead = 0L;
-                    var sw = Stopwatch.StartNew();
-                    var lastUpdate = sw.ElapsedMilliseconds;
-                    var lastBytes = 0L;
+                    var chunkSize = (int)Math.Min(buffer.Length, processedSize - bytesRead);
+                    var read = stream.Read(buffer, 0, chunkSize);
+                    tempFileStream.Write(buffer, 0, read);
+                    bytesRead += read;
                     
-                    while (bytesRead < compressedSize)
+                    var now = sw.ElapsedMilliseconds;
+                    if (now - lastUpdate >= 100)
                     {
-                        var chunkSize = (int)Math.Min(buffer.Length, compressedSize - bytesRead);
-                        var read = stream.Read(buffer, 0, chunkSize);
-                        tempFileStream.Write(buffer, 0, read);
-                        bytesRead += read;
-                        
-                        var now = sw.ElapsedMilliseconds;
-                        if (now - lastUpdate >= 100)
-                        {
-                            var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                            FileOperations.DisplayProgress(bytesRead, compressedSize, bytesPerSecond);
-                            lastUpdate = now;
-                            lastBytes = bytesRead;
-                        }
+                        var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
+                        FileOperations.DisplayProgress(bytesRead, processedSize, bytesPerSecond);
+                        lastUpdate = now;
+                        lastBytes = bytesRead;
                     }
-                }
-                
-                Console.WriteLine();
-                Console.WriteLine($"Decompressing data using {compressionAlgorithm}...");
-                
-                // Decompress data to final location
-                using (var compressedFileStream = File.OpenRead(tempFile))
-                using (var decompressedFileStream = File.Create(savePath))
-                {
-                    CompressionHelper.Decompress(compressedFileStream, decompressedFileStream, compressionAlgorithm);
-                }
-            }
-            finally
-            {
-                // Clean up temporary file
-                if (File.Exists(tempFile))
-                {
-                    File.Delete(tempFile);
-                }
-            }
-        }
-        else
-        {
-            // Receive and save file without decompression
-            using var fileStream = File.Create(savePath);
-            var buffer = new byte[8192];
-            var bytesRead = 0L;
-            var sw = Stopwatch.StartNew();
-            var lastUpdate = sw.ElapsedMilliseconds;
-            var lastBytes = 0L;
-            
-            while (bytesRead < originalSize)
-            {
-                var chunkSize = (int)Math.Min(buffer.Length, originalSize - bytesRead);
-                var read = stream.Read(buffer, 0, chunkSize);
-                fileStream.Write(buffer, 0, read);
-                bytesRead += read;
-                
-                var now = sw.ElapsedMilliseconds;
-                if (now - lastUpdate >= 100)
-                {
-                    var bytesPerSecond = (bytesRead - lastBytes) * 1000 / (now - lastUpdate);
-                    FileOperations.DisplayProgress(bytesRead, originalSize, bytesPerSecond);
-                    lastUpdate = now;
-                    lastBytes = bytesRead;
                 }
             }
             
             Console.WriteLine();
+            
+            // Process the received data (decrypt and/or decompress)
+            if (useEncryption || useCompression)
+            {
+                var processedTempFile = Path.GetTempFileName();
+                try
+                {
+                    var sourceStream = File.OpenRead(tempFile);
+                    
+                    // Decrypt if needed
+                    if (useEncryption)
+                    {
+                        Console.WriteLine("Decrypting data...");
+                        
+                        var decryptedTempFile = Path.GetTempFileName();
+                        try
+                        {
+                            using (var decryptedStream = File.Create(decryptedTempFile))
+                            {
+                                bool decryptionSuccess = EncryptionHelper.Decrypt(sourceStream, decryptedStream, _password!);
+                                
+                                if (!decryptionSuccess)
+                                {
+                                    Console.WriteLine("Warning: Decryption failed. File may be corrupted.");
+                                    // Continue with the encrypted data, hash verification will likely fail
+                                }
+                            }
+                            
+                            sourceStream.Dispose();
+                            sourceStream = File.OpenRead(decryptedTempFile);
+                        }
+                        finally
+                        {
+                            // Clean up temporary file
+                            if (File.Exists(decryptedTempFile) && decryptedTempFile != processedTempFile)
+                            {
+                                try
+                                {
+                                    File.Delete(decryptedTempFile);
+                                }
+                                catch (IOException)
+                                {
+                                    // Ignore file access errors during cleanup
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Decompress if needed
+                    if (useCompression)
+                    {
+                        Console.WriteLine($"Decompressing data using {compressionAlgorithm}...");
+                        
+                        using (var decompressedStream = File.Create(processedTempFile))
+                        {
+                            CompressionHelper.Decompress(sourceStream, decompressedStream, compressionAlgorithm);
+                        }
+                    }
+                    else
+                    {
+                        // Just copy the data if no decompression needed
+                        using (var destStream = File.Create(processedTempFile))
+                        {
+                            sourceStream.CopyTo(destStream);
+                        }
+                    }
+                    
+                    // Close the source stream
+                    sourceStream.Dispose();
+                    
+                    // Copy the processed file to the final location
+                    File.Copy(processedTempFile, savePath, true);
+                }
+                finally
+                {
+                    // Clean up temporary file
+                    if (File.Exists(processedTempFile))
+                    {
+                        File.Delete(processedTempFile);
+                    }
+                }
+            }
+            else
+            {
+                // No processing needed, just copy the file
+                File.Copy(tempFile, savePath, true);
+            }
+        }
+        finally
+        {
+            // Clean up temporary file
+            if (File.Exists(tempFile))
+            {
+                File.Delete(tempFile);
+            }
         }
         
         // Verify hash

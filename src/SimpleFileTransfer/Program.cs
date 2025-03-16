@@ -41,7 +41,18 @@ public class Program
 
         if (args[0] == "receive")
         {
-            var server = new FileTransferServer(DownloadsDirectory);
+            string? password = null;
+            
+            // Parse options
+            for (int i = 1; i < args.Length; i++)
+            {
+                if (args[i] == "--password" && i + 1 < args.Length)
+                {
+                    password = args[++i];
+                }
+            }
+            
+            var server = new FileTransferServer(DownloadsDirectory, Port, password);
             server.Start(CancellationToken.None);
         }
         else if (args[0] == "send" && args.Length >= 3)
@@ -50,8 +61,10 @@ public class Program
             var path = args[2];
             var useCompression = false;
             var compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip;
+            var useEncryption = false;
+            var password = string.Empty;
             
-            // Parse compression options
+            // Parse options
             for (int i = 3; i < args.Length; i++)
             {
                 if (args[i] == "--compress" || args[i] == "--gzip")
@@ -64,21 +77,39 @@ public class Program
                     useCompression = true;
                     compressionAlgorithm = CompressionHelper.CompressionAlgorithm.Brotli;
                 }
+                else if (args[i] == "--encrypt" && i + 1 < args.Length)
+                {
+                    useEncryption = true;
+                    password = args[++i];
+                }
             }
             
-            var client = new FileTransferClient(host, Port, useCompression, compressionAlgorithm);
-            
-            if (Directory.Exists(path))
+            try
             {
-                client.SendDirectory(path);
+                var client = new FileTransferClient(
+                    host, 
+                    Port, 
+                    useCompression, 
+                    compressionAlgorithm, 
+                    useEncryption, 
+                    password);
+                
+                if (Directory.Exists(path))
+                {
+                    client.SendDirectory(path);
+                }
+                else if (File.Exists(path))
+                {
+                    client.SendFile(path);
+                }
+                else
+                {
+                    Console.WriteLine($"Error: Path not found: {path}");
+                }
             }
-            else if (File.Exists(path))
+            catch (Exception ex)
             {
-                client.SendFile(path);
-            }
-            else
-            {
-                Console.WriteLine($"Error: Path not found: {path}");
+                Console.WriteLine($"Error: {ex.Message}");
             }
         }
         else
@@ -95,16 +126,25 @@ public class Program
         Console.WriteLine("SimpleFileTransfer - A simple file transfer utility");
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  receive                      - Start receiving files");
-        Console.WriteLine("  send <host> <path>           - Send a file or directory");
-        Console.WriteLine("  send <host> <path> --compress - Send a file or directory with GZip compression");
-        Console.WriteLine("  send <host> <path> --gzip    - Send a file or directory with GZip compression");
-        Console.WriteLine("  send <host> <path> --brotli  - Send a file or directory with Brotli compression");
+        Console.WriteLine("  receive [options]                - Start receiving files");
+        Console.WriteLine("  send <host> <path> [options]     - Send a file or directory");
+        Console.WriteLine();
+        Console.WriteLine("Options for receive:");
+        Console.WriteLine("  --password <password>            - Password for decrypting files");
+        Console.WriteLine();
+        Console.WriteLine("Options for send:");
+        Console.WriteLine("  --compress                       - Use GZip compression");
+        Console.WriteLine("  --gzip                           - Use GZip compression");
+        Console.WriteLine("  --brotli                         - Use Brotli compression");
+        Console.WriteLine("  --encrypt <password>             - Encrypt data with the specified password");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  SimpleFileTransfer receive");
+        Console.WriteLine("  SimpleFileTransfer receive --password mysecretpassword");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --compress");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfolder --brotli");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --encrypt mysecretpassword");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --brotli --encrypt mysecretpassword");
     }
 }
