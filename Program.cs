@@ -37,14 +37,14 @@ class Program
         
         var hostName = Dns.GetHostName();
         var addresses = Dns.GetHostAddresses(hostName)
-            .Where(ip => ip.AddressFamily == AddressFamily.InterNetwork && 
-                       ip.ToString().StartsWith("100."));
+            .Where(ip => ip.AddressFamily == AddressFamily.InterNetwork);
         
         Console.WriteLine($"Server started on port {Port}");
-        Console.WriteLine("Tailscale IP Addresses:");
+        Console.WriteLine("IP Addresses:");
         foreach (var ip in addresses)
         {
-            Console.WriteLine($"  {ip}");
+            var isTailscale = ip.ToString().StartsWith("100.");
+            Console.WriteLine($"  {ip}{(isTailscale ? " (Tailscale)" : "")}");
         }
         Console.WriteLine("Ctrl+C to exit");
         
