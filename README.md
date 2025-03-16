@@ -10,6 +10,30 @@ Make sure you have .NET 9.0 SDK installed, then run:
 dotnet build
 ```
 
+## Running Tests
+
+There are several ways to run the tests:
+
+### Using Visual Studio Test Explorer
+
+Open the solution in Visual Studio and use the Test Explorer to run the tests.
+
+### Using PowerShell Script (Recommended)
+
+Use the provided PowerShell script to run tests with a timeout to prevent hanging:
+
+```powershell
+.\run-tests.ps1
+```
+
+### Using dotnet CLI
+
+```bash
+dotnet test
+```
+
+Note: Running tests directly with `dotnet test` may occasionally hang due to background processes. Use the PowerShell script if this happens.
+
 ## Docker Support
 
 The project includes Docker support for both the application and tests.

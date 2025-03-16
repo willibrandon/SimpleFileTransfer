@@ -8,6 +8,8 @@ public class TransferQueueTests : IDisposable
     private CancellationTokenSource? _serverCts;
     private const string TestPassword = "testpassword123";
     private static int _portCounter = 9900; // Start from a different port than FileTransferTests
+    private StringWriter? _consoleWriter;
+    private TextWriter? _originalConsole;
 
     public TransferQueueTests()
     {
@@ -21,17 +23,52 @@ public class TransferQueueTests : IDisposable
 
     public void Dispose()
     {
-        _serverCts?.Cancel();
-        _serverTask?.Wait();
-        
-        // Clean up test directories
         try
         {
-            Directory.Delete(_testDir, true);
+            // Cancel the server and wait for it to terminate with a timeout
+            _serverCts?.Cancel();
+            
+            // Wait for the server task to complete with a timeout to prevent hanging
+            if (_serverTask != null)
+            {
+                if (!_serverTask.Wait(TimeSpan.FromSeconds(5)))
+                {
+                    Console.WriteLine("Warning: Server task did not complete within timeout period.");
+                }
+            }
+            
+            // Restore original console output
+            if (_originalConsole != null)
+            {
+                try
+                {
+                    Console.SetOut(_originalConsole);
+                }
+                catch (Exception)
+                {
+                    // Ignore any errors during cleanup
+                }
+            }
+            
+            // Dispose the console writer
+            _consoleWriter?.Dispose();
+            
+            // Clean up test directories
+            try
+            {
+                if (Directory.Exists(_testDir))
+                {
+                    Directory.Delete(_testDir, true);
+                }
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine($"Warning: Could not delete test directory: {ex.Message}");
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore errors during cleanup
+            Console.WriteLine($"Error during test cleanup: {ex.Message}");
         }
         
         GC.SuppressFinalize(this);
@@ -43,13 +80,14 @@ public class TransferQueueTests : IDisposable
         int port = Interlocked.Increment(ref _portCounter);
         
         _serverCts = new CancellationTokenSource();
+        
+        // Create StringWriter outside the task so it won't be disposed while the server is running
+        var writer = new StringWriter();
+        var originalOut = Console.Out;
+        Console.SetOut(writer);
+        
         _serverTask = Task.Run(() =>
         {
-            // Redirect console output to StringWriter to avoid polluting test output
-            var originalOut = Console.Out;
-            using var writer = new StringWriter();
-            Console.SetOut(writer);
-
             try
             {
                 var server = new FileTransferServer(_downloadDir, port, password, _serverCts.Token);
@@ -59,15 +97,25 @@ public class TransferQueueTests : IDisposable
             {
                 // Expected when we cancel the server
             }
-            finally
+            catch (Exception ex)
             {
-                Console.SetOut(originalOut);
+                // Log any unexpected exceptions
+                try
+                {
+                    Console.WriteLine($"Server error: {ex.Message}");
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Ignore if console is already disposed
+                }
             }
         });
 
-        // Give the server a moment to start
-        await Task.Delay(100);
+        // Store the writer and original console for cleanup in Dispose
+        _consoleWriter = writer;
+        _originalConsole = originalOut;
         
+        await Task.Delay(1000); // Give time for server to start
         return port;
     }
 

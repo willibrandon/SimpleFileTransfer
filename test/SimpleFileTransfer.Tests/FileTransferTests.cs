@@ -26,26 +26,54 @@ public class FileTransferTests : IDisposable
 
     public void Dispose()
     {
-        _serverCts?.Cancel();
-        _serverTask?.Wait();
-        
-        // Restore original console output
-        if (_originalConsole != null)
+        try
         {
+            // Cancel the server and wait for it to terminate with a timeout
+            _serverCts?.Cancel();
+            
+            // Wait for the server task to complete with a timeout to prevent hanging
+            if (_serverTask != null)
+            {
+                if (!_serverTask.Wait(TimeSpan.FromSeconds(5)))
+                {
+                    Console.WriteLine("Warning: Server task did not complete within timeout period.");
+                }
+            }
+            
+            // Restore original console output
+            if (_originalConsole != null)
+            {
+                try
+                {
+                    Console.SetOut(_originalConsole);
+                }
+                catch (Exception)
+                {
+                    // Ignore any errors during cleanup
+                }
+            }
+            
+            // Dispose the console writer
+            _consoleWriter?.Dispose();
+            
+            // Clean up temporary directories
             try
             {
-                Console.SetOut(_originalConsole);
+                if (Directory.Exists(_testDir))
+                {
+                    Directory.Delete(_testDir, true);
+                }
             }
-            catch (Exception)
+            catch (IOException ex)
             {
-                // Ignore any errors during cleanup
+                Console.WriteLine($"Warning: Could not delete test directory: {ex.Message}");
             }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during test cleanup: {ex.Message}");
+        }
         
-        // Dispose the console writer
-        _consoleWriter?.Dispose();
-        
-        Directory.Delete(_testDir, true);
         GC.SuppressFinalize(this);
     }
 
