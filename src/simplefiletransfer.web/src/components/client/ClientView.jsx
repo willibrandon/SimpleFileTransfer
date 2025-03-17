@@ -24,18 +24,30 @@ export function ClientView() {
       }
       
       const data = await response.json();
+      let historyItems = [];
       
       if (data && Array.isArray(data.items)) {
-        setTransferHistory(data.items);
+        historyItems = data.items;
       } else if (data && Array.isArray(data)) {
-        setTransferHistory(data);
+        historyItems = data;
       } else if (data && data.transfers && Array.isArray(data.transfers)) {
-        setTransferHistory(data.transfers);
+        historyItems = data.transfers;
       } else if (data && data.history && Array.isArray(data.history)) {
-        setTransferHistory(data.history);
+        historyItems = data.history;
       } else {
         setError('No transfer history available');
+        setTransferHistory([]);
+        return;
       }
+      
+      // Sort history by startTime in descending order (newest first)
+      const sortedHistory = [...historyItems].sort((a, b) => {
+        const dateA = new Date(a.startTime || a.StartTime || 0);
+        const dateB = new Date(b.startTime || b.StartTime || 0);
+        return dateB - dateA; // Descending order
+      });
+      
+      setTransferHistory(sortedHistory);
     } catch (error) {
       console.error('Error fetching transfer history:', error);
       setError(`Failed to load history: ${error.message}`);
@@ -70,7 +82,13 @@ export function ClientView() {
           }
         });
         
-        return Array.from(historyMap.values());
+        // Convert map to array and sort by startTime
+        const mergedHistory = Array.from(historyMap.values());
+        return mergedHistory.sort((a, b) => {
+          const dateA = new Date(a.startTime || a.StartTime || 0);
+          const dateB = new Date(b.startTime || b.StartTime || 0);
+          return dateB - dateA; // Descending order
+        });
       });
     }
   }, [wsTransferHistory]);

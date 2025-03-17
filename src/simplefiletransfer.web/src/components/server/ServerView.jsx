@@ -20,14 +20,25 @@ export function ServerView() {
       try {
         setIsLoading(true);
         const response = await serverApi.getFiles();
+        let files = [];
+        
         if (response && Array.isArray(response.files)) {
-          setReceivedFiles(response.files);
+          files = response.files;
         } else if (response && Array.isArray(response)) {
-          setReceivedFiles(response);
+          files = response;
         } else {
           console.warn('Unexpected response format from server files API:', response);
-          setReceivedFiles([]);
+          files = [];
         }
+        
+        // Sort files by receivedDate in descending order (newest first)
+        const sortedFiles = [...files].sort((a, b) => {
+          const dateA = new Date(a.receivedDate || 0);
+          const dateB = new Date(b.receivedDate || 0);
+          return dateB - dateA; // Descending order
+        });
+        
+        setReceivedFiles(sortedFiles);
       } catch (error) {
         console.error('Error fetching files:', error);
       } finally {
@@ -62,7 +73,13 @@ export function ServerView() {
           }
         });
         
-        return Array.from(fileMap.values());
+        // Convert map to array and sort by receivedDate
+        const mergedFiles = Array.from(fileMap.values());
+        return mergedFiles.sort((a, b) => {
+          const dateA = new Date(a.receivedDate || 0);
+          const dateB = new Date(b.receivedDate || 0);
+          return dateB - dateA; // Descending order
+        });
       });
     }
   }, [wsReceivedFiles]);

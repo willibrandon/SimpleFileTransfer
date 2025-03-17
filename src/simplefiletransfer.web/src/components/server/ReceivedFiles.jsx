@@ -22,8 +22,15 @@ export function ReceivedFiles({ files = [], isLoading = false }) {
       file.size > 0
     );
     
-    console.log('ReceivedFiles filtered valid files:', filtered);
-    setValidFiles(filtered);
+    // Sort files by receivedDate in descending order (newest first)
+    const sorted = [...filtered].sort((a, b) => {
+      const dateA = new Date(a.receivedDate || 0);
+      const dateB = new Date(b.receivedDate || 0);
+      return dateB - dateA; // Descending order
+    });
+    
+    console.log('ReceivedFiles filtered and sorted valid files:', sorted);
+    setValidFiles(sorted);
   }, [files]);
 
   const formatFileSize = (bytes) => {

@@ -12,7 +12,15 @@ export function ReceivedFilesList() {
       try {
         setIsLoading(true);
         const response = await serverApi.getFiles();
-        setFiles(response.files || []);
+        
+        // Sort files by receivedDate in descending order (newest first)
+        const sortedFiles = [...(response.files || [])].sort((a, b) => {
+          const dateA = new Date(a.receivedDate || 0);
+          const dateB = new Date(b.receivedDate || 0);
+          return dateB - dateA; // Descending order
+        });
+        
+        setFiles(sortedFiles);
         setError('');
       } catch (err) {
         setError('Failed to fetch received files');

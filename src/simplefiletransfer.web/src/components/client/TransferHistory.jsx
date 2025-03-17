@@ -10,8 +10,15 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
   // Process transfers prop
   useEffect(() => {
     if (Array.isArray(transfers) && transfers.length > 0) {
-      // Process transfers and set history state
-      setHistory(transfers);
+      // Sort transfers by startTime in descending order (newest first)
+      const sortedTransfers = [...transfers].sort((a, b) => {
+        const dateA = new Date(a.startTime || a.StartTime || 0);
+        const dateB = new Date(b.startTime || b.StartTime || 0);
+        return dateB - dateA; // Descending order
+      });
+      
+      // Set history state with sorted transfers
+      setHistory(sortedTransfers);
     }
   }, [transfers]);
 
