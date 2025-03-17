@@ -162,20 +162,24 @@ export function WebSocketProvider({ children }) {
   const processFileData = useCallback((fileData) => {
     if (!fileData) return null;
     
-    // Ensure we have the required fields
-    if (!fileData.id || !fileData.fileName || !fileData.size) {
+    // Ensure we have the required fields - check both lowercase and uppercase property names
+    const id = fileData.id || fileData.Id;
+    const fileName = fileData.fileName || fileData.FileName;
+    const size = fileData.size || fileData.Size;
+    
+    if (!id || !fileName || !size) {
       console.error('Invalid file data received:', fileData);
       return null;
     }
     
     return {
-      id: fileData.id,
-      fileName: fileData.fileName,
-      filePath: fileData.filePath || '',
-      directory: fileData.directory || '',
-      size: fileData.size,
-      receivedDate: fileData.receivedDate || new Date().toISOString(),
-      sender: fileData.sender || 'Unknown'
+      id: id,
+      fileName: fileName,
+      filePath: fileData.filePath || fileData.FilePath || '',
+      directory: fileData.directory || fileData.Directory || '',
+      size: size,
+      receivedDate: fileData.receivedDate || fileData.ReceivedDate || new Date().toISOString(),
+      sender: fileData.sender || fileData.Sender || 'Unknown'
     };
   }, []);
 

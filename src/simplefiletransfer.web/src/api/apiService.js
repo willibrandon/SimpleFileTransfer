@@ -216,8 +216,31 @@ export const clientApi = {
   // Get transfer history
   getHistory: async () => {
     try {
+      console.log('Fetching transfer history from API...');
       const response = await fetch(`${API_BASE_URL}/client/history`);
-      return await response.json();
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response from history API:', response.status, errorText);
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const responseText = await response.text();
+      console.log('Raw history API response:', responseText);
+      
+      if (!responseText || responseText.trim() === '') {
+        console.log('Empty response from history API, returning empty array');
+        return { items: [] };
+      }
+      
+      try {
+        const data = JSON.parse(responseText);
+        console.log('Parsed history API response:', data);
+        return data;
+      } catch (parseError) {
+        console.error('Failed to parse history API response:', parseError);
+        throw new Error('Invalid JSON response from server');
+      }
     } catch (error) {
       console.error('Error fetching transfer history:', error);
       throw error;

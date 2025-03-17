@@ -1,12 +1,78 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FileTransferForm } from './FileTransferForm'
 import { QueueManager } from './QueueManager'
 import { TransferHistory } from './TransferHistory'
 import { useWebSocket } from '../../WebSocketContext'
 
 export function ClientView() {
-  const { transferHistory, queueStatus } = useWebSocket()
+  const { transferHistory: wsTransferHistory, queueStatus } = useWebSocket()
+  const [transferHistory, setTransferHistory] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
   const [isProcessing, setIsProcessing] = useState(queueStatus.isProcessing)
+  const [error, setError] = useState('')
+  
+  // Fetch transfer history directly from API
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setIsLoading(true);
+        setError('');
+        
+        const response = await fetch('/api/client/history');
+        
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data && Array.isArray(data.items)) {
+          setTransferHistory(data.items);
+        } else if (data && Array.isArray(data)) {
+          setTransferHistory(data);
+        } else if (data && data.transfers && Array.isArray(data.transfers)) {
+          setTransferHistory(data.transfers);
+        } else if (data && data.history && Array.isArray(data.history)) {
+          setTransferHistory(data.history);
+        } else {
+          setError('No transfer history available');
+        }
+      } catch (error) {
+        console.error('Error fetching transfer history:', error);
+        setError(`Failed to load history: ${error.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchHistory();
+    
+    // Set up a refresh interval
+    const interval = setInterval(fetchHistory, 30000); // Refresh every 30 seconds
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+  
+  // Merge transfer history from WebSocket
+  useEffect(() => {
+    if (wsTransferHistory && wsTransferHistory.length > 0) {
+      setTransferHistory(prevHistory => {
+        // Create a map of existing transfers by ID
+        const historyMap = new Map(prevHistory.map(item => [item.id, item]));
+        
+        // Add or update transfers from WebSocket
+        wsTransferHistory.forEach(item => {
+          if (item && item.id) {
+            historyMap.set(item.id, item);
+          }
+        });
+        
+        return Array.from(historyMap.values());
+      });
+    }
+  }, [wsTransferHistory]);
   
   // Handle processing state changes from QueueManager
   const handleProcessingChange = (newState) => {
@@ -30,7 +96,11 @@ export function ClientView() {
           />
         </div>
         <div className="client-history">
-          <TransferHistory transfers={transferHistory} />
+          <TransferHistory 
+            transfers={transferHistory} 
+            isLoading={isLoading} 
+            error={error}
+          />
         </div>
       </div>
     </div>
