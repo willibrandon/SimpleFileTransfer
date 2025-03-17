@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 
 // Create a context for the WebSocket
 const WebSocketContext = createContext(null);
@@ -22,28 +22,35 @@ export function WebSocketProvider({ children }) {
   const reconnectTimeoutId = useRef(null);
   const isUnmounting = useRef(false);
   const hasCheckedServerStatus = useRef(false);
+  const lastServerStatus = useRef({ isRunning: false, port: 0 });
 
-  // Check server status via API
-  const checkServerStatus = async () => {
+  // Check server status via API - memoized to prevent unnecessary re-renders
+  const checkServerStatus = useCallback(async () => {
     try {
       const response = await fetch('/api/server/status');
       if (response.ok) {
         const data = await response.json();
         console.log('Server status from API:', data);
-        setServerStatus({ 
-          isRunning: data.isRunning, 
-          port: data.port || 0 
-        });
+        
+        // Only update state if the status has changed
+        if (lastServerStatus.current.isRunning !== data.isRunning || 
+            lastServerStatus.current.port !== data.port) {
+          lastServerStatus.current = { 
+            isRunning: data.isRunning, 
+            port: data.port || 0 
+          };
+          setServerStatus(lastServerStatus.current);
+        }
         return data.isRunning;
       }
     } catch (error) {
       console.error('Error checking server status:', error);
     }
     return false;
-  };
+  }, []);
 
-  // Function to create a new WebSocket connection
-  const createWebSocketConnection = () => {
+  // Function to create a new WebSocket connection - memoized
+  const createWebSocketConnection = useCallback(() => {
     if (isUnmounting.current) return;
     
     // Clear any existing reconnection timeout
@@ -122,80 +129,148 @@ export function WebSocketProvider({ children }) {
     
     // Save the socket to state
     setSocket(newSocket);
-  };
+  }, []);
 
   // Connect to the WebSocket server
   useEffect(() => {
-    isUnmounting.current = false;
+    if (!socket && !isUnmounting.current) {
+      createWebSocketConnection();
+    }
     
-    // Check server status immediately on mount
-    const initialStatusCheck = async () => {
-      await checkServerStatus();
+    // Check server status on initial load
+    if (!hasCheckedServerStatus.current) {
       hasCheckedServerStatus.current = true;
-    };
-    initialStatusCheck();
+      checkServerStatus();
+    }
     
-    // Create WebSocket connection
-    createWebSocketConnection();
-    
-    // Clean up on unmount
     return () => {
       isUnmounting.current = true;
       
+      // Clean up the socket
+      if (socket) {
+        socket.close();
+      }
+      
+      // Clear any reconnection timeout
       if (reconnectTimeoutId.current) {
         clearTimeout(reconnectTimeoutId.current);
       }
-      
-      if (socket) {
-        // Use a clean close code to prevent reconnection attempts
-        socket.close(1000, "Component unmounting");
-      }
     };
-  }, []);
+  }, [socket, createWebSocketConnection, checkServerStatus]);
   
   // Process file data to ensure it's valid
-  const processFileData = (file) => {
-    if (!file) {
-      console.log('processFileData received null file');
+  const processFileData = useCallback((fileData) => {
+    if (!fileData) return null;
+    
+    // Ensure we have the required fields
+    if (!fileData.id || !fileData.fileName || !fileData.size) {
+      console.error('Invalid file data received:', fileData);
       return null;
     }
     
-    console.log('Raw file data:', file);
-    
-    // Handle different property name formats (camelCase vs PascalCase)
-    const rawFileName = file.fileName || file.FileName || '';
-    const rawFilePath = file.filePath || file.FilePath || '';
-    const rawDirectory = file.directory || file.Directory || '';
-    const rawSize = file.size || file.Size || 0;
-    const rawSender = file.sender || file.Sender || 'Unknown';
-    const rawReceivedDate = file.receivedDate || file.ReceivedDate || new Date().toISOString();
-    
-    // Generate an ID if one doesn't exist
-    const id = file.id || file.Id || `file-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    
-    // Extract directory from file path if not provided
-    let directory = rawDirectory;
-    if (!directory && rawFilePath) {
-      const lastSlashIndex = Math.max(
-        rawFilePath.lastIndexOf('\\'),
-        rawFilePath.lastIndexOf('/')
-      );
-      if (lastSlashIndex > 0) {
-        directory = rawFilePath.substring(0, lastSlashIndex);
-      }
-    }
-    
     return {
-      id: id,
-      fileName: rawFileName,
-      filePath: rawFilePath,
-      directory: directory,
-      size: typeof rawSize === 'number' ? rawSize : parseInt(rawSize, 10) || 0,
-      sender: rawSender,
-      receivedDate: rawReceivedDate
+      id: fileData.id,
+      fileName: fileData.fileName,
+      filePath: fileData.filePath || '',
+      directory: fileData.directory || '',
+      size: fileData.size,
+      receivedDate: fileData.receivedDate || new Date().toISOString(),
+      sender: fileData.sender || 'Unknown'
     };
-  };
-  
+  }, []);
+
+  // Handle WebSocket messages
+  const handleMessage = useCallback((event) => {
+    try {
+      const message = JSON.parse(event.data);
+      console.log('WebSocket message received:', message);
+      
+      if (message.type === 'server_status') {
+        // Only update if the status has changed
+        if (lastServerStatus.current.isRunning !== message.data.isRunning || 
+            lastServerStatus.current.port !== message.data.port) {
+          lastServerStatus.current = { 
+            isRunning: message.data.isRunning, 
+            port: message.data.port || 0 
+          };
+          setServerStatus(lastServerStatus.current);
+        }
+      } else if (message.type === 'server_started') {
+        lastServerStatus.current = { isRunning: true, port: message.data.port || 0 };
+        setServerStatus(lastServerStatus.current);
+      } else if (message.type === 'server_stopped') {
+        lastServerStatus.current = { isRunning: false, port: 0 };
+        setServerStatus(lastServerStatus.current);
+      } else if (message.type === 'received_files') {
+        // Process the received files list
+        console.log('Received files list:', message.data);
+        
+        if (Array.isArray(message.data)) {
+          const validFiles = message.data
+            .map(processFileData)
+            .filter(file => file !== null);
+          
+          setReceivedFiles(validFiles);
+        }
+      } else if (message.type === 'file_received') {
+        // Process the received file
+        const fileData = processFileData(message.data);
+        
+        if (fileData) {
+          // Check if this file is already in the list (avoid duplicates)
+          setReceivedFiles(prevFiles => {
+            const existingFile = prevFiles.find(f => f.id === fileData.id);
+            if (existingFile) {
+              return prevFiles;
+            }
+            return [...prevFiles, fileData];
+          });
+        }
+      } else if (message.type === 'transfer_started' || 
+                message.type === 'transfer_progress' || 
+                message.type === 'transfer_completed' || 
+                message.type === 'transfer_failed') {
+        // Update transfer history
+        setTransferHistory(prev => {
+          const updatedHistory = [...prev];
+          const existingIndex = updatedHistory.findIndex(t => 
+            t.id === message.data.id || 
+            (t.fileName === message.data.fileName && t.targetHost === message.data.targetHost)
+          );
+          
+          if (existingIndex >= 0) {
+            updatedHistory[existingIndex] = {
+              ...updatedHistory[existingIndex],
+              ...message.data,
+              status: message.type.replace('transfer_', ''),
+              lastUpdated: new Date().toISOString()
+            };
+          } else {
+            updatedHistory.push({
+              ...message.data,
+              id: message.data.id || `transfer-${Date.now()}`,
+              status: message.type.replace('transfer_', ''),
+              lastUpdated: new Date().toISOString()
+            });
+          }
+          
+          return updatedHistory;
+        });
+      } else if (message.type === 'queue_status') {
+        // Update queue status
+        setQueueStatus({
+          isProcessing: message.data.isProcessing,
+          count: message.data.count || 0
+        });
+      }
+      
+      // Add to events history
+      setEvents(prev => [...prev, message]);
+    } catch (error) {
+      console.error('Error handling WebSocket message:', error);
+    }
+  }, [processFileData]);
+
   // Handle WebSocket events
   const handleEvent = (event) => {
     switch (event.type) {
@@ -339,27 +414,27 @@ export function WebSocketProvider({ children }) {
   };
   
   // Send a message to the WebSocket server
-  const sendMessage = (message) => {
-    if (socket && connected) {
-      socket.send(JSON.stringify(message));
-    } else {
-      console.error('Cannot send message: WebSocket not connected');
+  const sendMessage = useCallback((type, data) => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      const message = JSON.stringify({ type, data });
+      socket.send(message);
+      return true;
     }
-  };
+    return false;
+  }, [socket]);
   
-  // The value to provide to consumers
-  const value = {
+  // Provide the WebSocket context
+  const contextValue = {
     connected,
-    events,
     serverStatus,
     receivedFiles,
     transferHistory,
     queueStatus,
     sendMessage
   };
-  
+
   return (
-    <WebSocketContext.Provider value={value}>
+    <WebSocketContext.Provider value={contextValue}>
       {children}
     </WebSocketContext.Provider>
   );

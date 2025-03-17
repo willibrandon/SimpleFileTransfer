@@ -225,7 +225,8 @@ button:disabled {
   position: relative; /* Added for absolute positioning of status message */
 }
 
-.server-control-panel {
+.server-control-panel,
+.file-transfer-form {
   padding-top: 0.75rem; /* Reduced top padding */
 }
 
@@ -239,7 +240,9 @@ button:disabled {
   font-size: 1.5rem;
 }
 
-.server-control-panel h2 {
+.server-control-panel h2,
+.file-transfer-form h2,
+.transfer-history h2 {
   margin-top: 0; /* Remove top margin */
 }
 
@@ -252,7 +255,10 @@ button:disabled {
 
 .server-control-panel input[type="text"],
 .server-control-panel input[type="number"],
-.server-control-panel input[type="password"] {
+.server-control-panel input[type="password"],
+.file-transfer-form input[type="text"],
+.file-transfer-form input[type="number"],
+.file-transfer-form input[type="password"] {
   max-width: 95%; /* Prevent inputs from touching the right edge */
 }
 
@@ -404,7 +410,8 @@ button:disabled {
 .client-container {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 2rem;
+  gap: 1.5rem;
+  min-height: 500px; /* Minimum height to prevent layout shifts */
 }
 
 footer {
@@ -607,4 +614,23 @@ footer {
   background-color: rgba(52, 152, 219, 0.1);
   color: #3498db;
   border: 1px solid rgba(52, 152, 219, 0.3);
+}
+
+/* Client view specific styles */
+.client-view h1 {
+  margin-top: 0.5rem; /* Small top margin */
+  margin-bottom: 0.5rem;
+}
+
+.client-view .description {
+  margin-bottom: 1rem; /* Reduced margin */
+}
+
+.transfer-history {
+  padding-top: 0.75rem; /* Reduced top padding */
+  min-height: 200px; /* Minimum height to prevent layout shifts */
+}
+
+.queue-manager {
+  margin-top: 1.5rem;
 }
