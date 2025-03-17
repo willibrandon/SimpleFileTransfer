@@ -97,7 +97,6 @@ export function ServerControlPanel({ isRunning, port }) {
           <button 
             className="control-button stop"
             onClick={handleStopServer}
-            disabled={!connected}
           >
             Stop Server
           </button>
@@ -105,7 +104,6 @@ export function ServerControlPanel({ isRunning, port }) {
           <button 
             className="control-button start"
             onClick={handleStartServer}
-            disabled={!connected}
           >
             Start Server
           </button>
@@ -140,7 +138,7 @@ export function ServerControlPanel({ isRunning, port }) {
           name="downloadsDirectory"
           value={config.downloadsDirectory}
           onChange={handleChange}
-          placeholder="Leave empty for default"
+          placeholder="Default: ./downloads (in application directory)"
           disabled={isRunning}
         />
       </div>
@@ -176,7 +174,7 @@ export function ServerControlPanel({ isRunning, port }) {
       <button 
         className="save-button"
         onClick={handleSaveConfig}
-        disabled={isRunning || !connected}
+        disabled={isRunning}
       >
         Save Configuration
       </button>

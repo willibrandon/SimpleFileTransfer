@@ -50,6 +50,17 @@ public static class Program
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddOpenApi();
+        
+        // Add CORS policy
+        builder.Services.AddCors(options =>
+        {
+            options.AddDefaultPolicy(policy =>
+            {
+                policy.AllowAnyOrigin()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            });
+        });
 
         var app = builder.Build();
 
@@ -61,6 +72,10 @@ public static class Program
 
         app.UseHttpsRedirection();
         app.UseAuthorization();
+        
+        // Use CORS middleware
+        app.UseCors();
+        
         app.MapControllers();
 
         // Configure WebSockets

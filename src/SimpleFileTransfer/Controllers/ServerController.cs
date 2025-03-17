@@ -62,6 +62,12 @@ public class ServerController : ControllerBase
                 _config = config;
             }
 
+            // Ensure downloads directory is not empty
+            if (string.IsNullOrWhiteSpace(_config.DownloadsDirectory))
+            {
+                _config.DownloadsDirectory = Program.DownloadsDirectory;
+            }
+
             // Create downloads directory
             Directory.CreateDirectory(_config.DownloadsDirectory);
 

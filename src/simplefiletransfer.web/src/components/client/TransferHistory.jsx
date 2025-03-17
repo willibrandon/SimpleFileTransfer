@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { clientApi } from '../../api/apiService';
 
 export function TransferHistory({ transfers = [] }) {
