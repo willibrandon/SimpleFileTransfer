@@ -101,6 +101,7 @@ public static class Program
             var password = string.Empty;
             var resumeEnabled = false;
             var queueTransfer = false;
+            var speedLimit = 0; // No limit by default
             
             // Collect all paths before options
             int i = 2;
@@ -136,6 +137,18 @@ public static class Program
                 {
                     queueTransfer = true;
                 }
+                else if ((args[i] == "--limit" || args[i] == "--speed-limit") && i + 1 < args.Length)
+                {
+                    // Parse the speed limit value in KB/s
+                    if (int.TryParse(args[++i], out int limit) && limit > 0)
+                    {
+                        speedLimit = limit;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Warning: Invalid speed limit '{args[i]}'. Using no limit.");
+                    }
+                }
             }
             
             try
@@ -155,7 +168,8 @@ public static class Program
                                 compressionAlgorithm,
                                 useEncryption,
                                 password,
-                                resumeEnabled);
+                                resumeEnabled,
+                                speedLimit > 0 ? speedLimit : null);
                             
                             Queue.Enqueue(transfer);
                             
@@ -176,7 +190,8 @@ public static class Program
                                 compressionAlgorithm, 
                                 useEncryption, 
                                 password,
-                                resumeEnabled);
+                                resumeEnabled,
+                                speedLimit > 0 ? speedLimit : null);
                             
                             client.SendDirectory(path);
                         }
@@ -193,7 +208,8 @@ public static class Program
                                 compressionAlgorithm,
                                 useEncryption,
                                 password,
-                                resumeEnabled);
+                                resumeEnabled,
+                                speedLimit > 0 ? speedLimit : null);
                             
                             Queue.Enqueue(transfer);
                             
@@ -214,7 +230,8 @@ public static class Program
                                 compressionAlgorithm, 
                                 useEncryption, 
                                 password,
-                                resumeEnabled);
+                                resumeEnabled,
+                                speedLimit > 0 ? speedLimit : null);
                             
                             client.SendFile(path);
                         }
@@ -265,7 +282,8 @@ public static class Program
                                 compressionAlgorithm,
                                 useEncryption,
                                 password,
-                                resumeEnabled);
+                                resumeEnabled,
+                                speedLimit > 0 ? speedLimit : null);
                             
                             Queue.Enqueue(transfer);
                             
@@ -286,7 +304,8 @@ public static class Program
                                 compressionAlgorithm, 
                                 useEncryption, 
                                 password,
-                                resumeEnabled);
+                                resumeEnabled,
+                                speedLimit > 0 ? speedLimit : null);
                             
                             Console.WriteLine($"Sending {validFiles.Count} files to {host}");
                             client.SendMultipleFiles(validFiles);
@@ -326,6 +345,7 @@ public static class Program
                 
                 string? password = null;
                 bool queueTransfer = false;
+                int speedLimit = 0; // No limit by default
                 
                 // Parse options
                 for (int i = 2; i < args.Length; i++)
@@ -337,6 +357,17 @@ public static class Program
                     else if (args[i] == "--queue")
                     {
                         queueTransfer = true;
+                    }
+                    else if ((args[i] == "--limit" || args[i] == "--speed-limit") && i + 1 < args.Length)
+                    {
+                        if (int.TryParse(args[++i], out int limit) && limit > 0)
+                        {
+                            speedLimit = limit;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Warning: Invalid speed limit '{args[i]}'. Using no limit.");
+                        }
                     }
                 }
                 
@@ -384,7 +415,8 @@ public static class Program
                                 info.CompressionAlgorithm,
                                 info.UseEncryption,
                                 password,
-                                true);
+                                true,
+                                info.SpeedLimit > 0 ? info.SpeedLimit : null);
                             
                             Queue.Enqueue(transfer);
                             
@@ -426,7 +458,8 @@ public static class Program
                             info.CompressionAlgorithm,
                             info.UseEncryption,
                             password,
-                            true);
+                            true,
+                            info.SpeedLimit > 0 ? info.SpeedLimit : null);
                         
                         Queue.Enqueue(transfer);
                         
@@ -447,7 +480,8 @@ public static class Program
                             info.CompressionAlgorithm,
                             info.UseEncryption,
                             password,
-                            true);
+                            true,
+                            info.SpeedLimit > 0 ? info.SpeedLimit : null);
                         
                         Queue.Enqueue(transfer);
                         
@@ -617,10 +651,20 @@ public static class Program
         Console.WriteLine("  --encrypt <password>                   - Encrypt data with the specified password");
         Console.WriteLine("  --resume                               - Enable resume capability for interrupted transfers");
         Console.WriteLine("  --queue                                - Add the transfer to the queue instead of executing immediately");
+        Console.WriteLine("  --limit <KB/s>                         - Limit transfer speed (in KB/s)");
+        Console.WriteLine("  --speed-limit <KB/s>                   - Limit transfer speed (in KB/s)");
         Console.WriteLine();
         Console.WriteLine("Options for resume:");
         Console.WriteLine("  --password <password>                  - Password for encryption (if the transfer is encrypted)");
         Console.WriteLine("  --queue                                - Add the transfer to the queue instead of executing immediately");
+        Console.WriteLine("  --limit <KB/s>                         - Limit transfer speed (in KB/s)");
+        Console.WriteLine("  --speed-limit <KB/s>                   - Limit transfer speed (in KB/s)");
+        Console.WriteLine();
+        Console.WriteLine("Speed limiting:");
+        Console.WriteLine("  The --limit and --speed-limit options can be used to throttle the transfer speed.");
+        Console.WriteLine("  The value is specified in kilobytes per second (KB/s).");
+        Console.WriteLine("  For example, --limit 1024 will limit the transfer to approximately 1 MB/s.");
+        Console.WriteLine("  This is useful to prevent transfers from consuming all available bandwidth.");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  SimpleFileTransfer receive");
@@ -634,10 +678,13 @@ public static class Program
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --brotli --encrypt mysecretpassword --resume");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --queue");
         Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 file1.txt file2.txt --queue");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfile.txt --limit 1024");
+        Console.WriteLine("  SimpleFileTransfer send 192.168.1.100 myfolder --compress --speed-limit 512");
         Console.WriteLine("  SimpleFileTransfer list-resume");
         Console.WriteLine("  SimpleFileTransfer resume 1");
         Console.WriteLine("  SimpleFileTransfer resume 1 --password mysecretpassword");
         Console.WriteLine("  SimpleFileTransfer resume 1 --queue");
+        Console.WriteLine("  SimpleFileTransfer resume 1 --limit 2048");
         Console.WriteLine("  SimpleFileTransfer queue-list");
         Console.WriteLine("  SimpleFileTransfer queue-start");
         Console.WriteLine("  SimpleFileTransfer queue-stop");

@@ -21,6 +21,7 @@ public class FileTransferClient
     private readonly bool _useEncryption;
     private readonly string? _password;
     private readonly bool _resumeEnabled;
+    private readonly int? _speedLimit;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FileTransferClient"/> class.
@@ -32,6 +33,7 @@ public class FileTransferClient
     /// <param name="useEncryption">Whether to use encryption for file transfers. Defaults to false.</param>
     /// <param name="password">The password to use for encryption. Required if useEncryption is true.</param>
     /// <param name="resumeEnabled">Whether to enable resume capability for file transfers. Defaults to false.</param>
+    /// <param name="speedLimit">Optional speed limit in KB/s. Null means no limit.</param>
     public FileTransferClient(
         string host, 
         int port = Program.Port, 
@@ -39,7 +41,8 @@ public class FileTransferClient
         CompressionHelper.CompressionAlgorithm compressionAlgorithm = CompressionHelper.CompressionAlgorithm.GZip,
         bool useEncryption = false,
         string? password = null,
-        bool resumeEnabled = false)
+        bool resumeEnabled = false,
+        int? speedLimit = null)
     {
         _host = host;
         _port = port;
@@ -48,6 +51,7 @@ public class FileTransferClient
         _useEncryption = useEncryption;
         _password = password;
         _resumeEnabled = resumeEnabled;
+        _speedLimit = speedLimit;
         
         if (_useEncryption && string.IsNullOrEmpty(_password))
         {
@@ -120,7 +124,8 @@ public class FileTransferClient
                 CompressionAlgorithm = _compressionAlgorithm,
                 UseEncryption = _useEncryption,
                 Host = _host,
-                Port = _port
+                Port = _port,
+                SpeedLimit = _speedLimit ?? 0
             };
             
             TransferResumeManager.CreateResumeFile(resumeInfo);
@@ -481,7 +486,8 @@ public class FileTransferClient
                         Host = _host,
                         Port = _port,
                         DirectoryName = dirInfo.Name,
-                        RelativePath = relativePath
+                        RelativePath = relativePath,
+                        SpeedLimit = _speedLimit ?? 0
                     };
                     
                     TransferResumeManager.CreateResumeFile(resumeInfo);
@@ -812,7 +818,8 @@ public class FileTransferClient
             info.CompressionAlgorithm,
             info.UseEncryption,
             password,
-            true);
+            true,
+            info.SpeedLimit > 0 ? info.SpeedLimit : null);
         
         if (!string.IsNullOrEmpty(info.DirectoryName))
         {
@@ -956,7 +963,8 @@ public class FileTransferClient
                         UseEncryption = _useEncryption,
                         Host = _host,
                         Port = _port,
-                        IsMultiFile = true
+                        IsMultiFile = true,
+                        SpeedLimit = _speedLimit ?? 0
                     };
                     
                     TransferResumeManager.CreateResumeFile(resumeInfo);

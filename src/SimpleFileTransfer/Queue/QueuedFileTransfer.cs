@@ -19,6 +19,7 @@ namespace SimpleFileTransfer.Queue;
 /// <param name="useEncryption">Whether to use encryption for the transfer.</param>
 /// <param name="password">The password to use for encryption.</param>
 /// <param name="resumeEnabled">Whether to enable resume capability for the transfer.</param>
+/// <param name="speedLimit">Optional speed limit in KB/s. Null means no limit.</param>
 /// <param name="port">The port number to connect to. Defaults to <see cref="Program.Port"/>.</param>
 public class QueuedFileTransfer(
     string host,
@@ -28,11 +29,13 @@ public class QueuedFileTransfer(
     bool useEncryption = false,
     string? password = null,
     bool resumeEnabled = false,
+    int? speedLimit = null,
     int port = Program.Port) : QueuedTransfer
 {
 
     /// <inheritdoc/>
-    public override string Description => $"File: {Path.GetFileName(filePath)} to {host}";
+    public override string Description => $"File: {Path.GetFileName(filePath)} to {host}" + 
+                                         (speedLimit.HasValue ? $" (Speed limit: {speedLimit} KB/s)" : "");
     
     /// <inheritdoc/>
     public override Task ExecuteAsync(CancellationToken cancellationToken)
@@ -46,7 +49,8 @@ public class QueuedFileTransfer(
                 compressionAlgorithm,
                 useEncryption,
                 password,
-                resumeEnabled);
+                resumeEnabled,
+                speedLimit);
             
             client.SendFile(filePath);
         }, cancellationToken);

@@ -77,4 +77,9 @@ public class ResumeInfo
     /// The timestamp when this resume info was last updated.
     /// </summary>
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    
+    /// <summary>
+    /// The speed limit for the transfer in KB/s. Zero means no limit.
+    /// </summary>
+    public int SpeedLimit { get; set; }
 }
