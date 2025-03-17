@@ -36,6 +36,11 @@ public class TransferController(IFileTransferService fileTransferService) : Cont
     [HttpPost]
     public async Task<IActionResult> TransferFile([FromBody] TransferRequest request)
     {
+        if (request == null)
+        {
+            return BadRequest(new { error = "Request cannot be null" });
+        }
+
         if (string.IsNullOrEmpty(request.SourcePath) || string.IsNullOrEmpty(request.DestinationPath))
         {
             return BadRequest(new { error = "Source and destination paths are required" });

@@ -1,8 +1,5 @@
-using System;
-using System.IO;
-using SimpleFileTransfer.Core;
-using SimpleFileTransfer.Helpers;
 using Moq;
+using SimpleFileTransfer.Core;
 
 namespace SimpleFileTransfer.Tests.Core;
 
@@ -31,6 +28,8 @@ public class EncryptedFileTransferTests : IDisposable
                 // Ignore cleanup errors
             }
         }
+
+        GC.SuppressFinalize(this);
     }
 
     [Fact]
@@ -185,4 +184,4 @@ public class EncryptedFileTransferTests : IDisposable
         // Clean up the temp file
         File.Delete(tempFile);
     }
-} 
+}

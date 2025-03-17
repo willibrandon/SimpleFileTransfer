@@ -1,7 +1,3 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
-using SimpleFileTransfer.Core;
 using SimpleFileTransfer.Services;
 
 namespace SimpleFileTransfer.Tests.Services;
@@ -34,6 +30,8 @@ public class FileTransferServiceTests : IDisposable
                 // Ignore cleanup errors
             }
         }
+
+        GC.SuppressFinalize(this);
     }
 
     [Fact]
@@ -85,13 +83,8 @@ public class FileTransferServiceTests : IDisposable
         Assert.True(File.Exists(destFile));
         
         // Since we're now using real compression, we need to verify the content differently
-        // The file size should be smaller than the original
-        var originalSize = new FileInfo(sourceFile).Length;
-        var compressedSize = new FileInfo(destFile).Length;
-        
         // For very small files, compression might not reduce size significantly
         // So we'll just verify the file exists and can be read
-        Assert.True(File.Exists(destFile));
         
         // Read the content to verify it's not corrupted
         string readContent = File.ReadAllText(destFile);
@@ -263,4 +256,4 @@ public class FileTransferServiceTests : IDisposable
         Assert.True(File.Exists(destFile));
         Assert.Equal(content, File.ReadAllText(destFile));
     }
-} 
+}
