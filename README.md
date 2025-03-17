@@ -238,3 +238,25 @@ SimpleFileTransfer includes a web interface for easy file transfers. To use the 
 3. Open your browser and navigate to the URL shown in the console (typically http://localhost:5173)
 
 4. Use the web interface to transfer files with optional compression and encryption 
+
+### Web Interface Features
+
+The web interface provides a modern, user-friendly way to interact with SimpleFileTransfer:
+
+- **Transfer History**: View all current and past file transfers with detailed status information
+- **Server Management**: Start and stop the file transfer server directly from the web interface
+- **File Queue Management**: Add files to the transfer queue, start/stop queue processing, and clear the queue
+- **Received Files List**: Browse and download files that have been received by the server
+- **Transfer Options**: Configure compression, encryption, and speed limits through an intuitive interface
+- **WebSocket Communication**: Real-time updates using WebSocket technology for instant feedback
+- **Responsive Design**: Works on desktop and mobile devices with a responsive layout
+
+### Screenshots
+
+<div align="center">
+  <p><strong>Server Mode</strong></p>
+  <img src="./screenshots/server-mode.png" alt="Server Mode" width="700"/>
+  <br><br>
+  <p><strong>Client Mode</strong></p>
+  <img src="./screenshots/client-mode.png" alt="Client Mode" width="700"/>
+</div> 
