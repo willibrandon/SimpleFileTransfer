@@ -13,21 +13,17 @@ namespace SimpleFileTransfer.Controllers;
 /// compression and encryption. It uses the <see cref="IFileTransferService"/> to
 /// perform the actual file transfer operations.
 /// </remarks>
+/// <remarks>
+/// Initializes a new instance of the <see cref="TransferController"/> class.
+/// </remarks>
+/// <param name="fileTransferService">The file transfer service to use for file operations.</param>
+/// <exception cref="ArgumentNullException">Thrown when <paramref name="fileTransferService"/> is null.</exception>
 [ApiController]
 [Route("api/[controller]")]
-public class TransferController : ControllerBase
+public class TransferController(IFileTransferService fileTransferService) : ControllerBase
 {
-    private readonly IFileTransferService _fileTransferService;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="TransferController"/> class.
-    /// </summary>
-    /// <param name="fileTransferService">The file transfer service to use for file operations.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="fileTransferService"/> is null.</exception>
-    public TransferController(IFileTransferService fileTransferService)
-    {
-        _fileTransferService = fileTransferService ?? throw new ArgumentNullException(nameof(fileTransferService));
-    }
+    private readonly IFileTransferService _fileTransferService = fileTransferService
+        ?? throw new ArgumentNullException(nameof(fileTransferService));
 
     /// <summary>
     /// Transfers a file from source to destination with optional compression and encryption.

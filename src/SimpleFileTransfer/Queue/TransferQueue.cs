@@ -11,7 +11,7 @@ namespace SimpleFileTransfer.Queue;
 public class TransferQueue
 {
     private readonly List<QueuedTransfer> _queue = [];
-    private readonly object _queueLock = new();
+    private readonly Lock _queueLock = new();
     private bool _isProcessing;
     private CancellationTokenSource? _cancellationTokenSource;
     

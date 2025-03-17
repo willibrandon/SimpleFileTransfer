@@ -12,19 +12,15 @@ namespace SimpleFileTransfer.Core;
 /// In a real implementation, this would use a compression library, but for simplicity,
 /// this implementation just copies the file.
 /// </remarks>
-public class CompressedFileTransfer : FileTransfer
+/// <remarks>
+/// Initializes a new instance of the <see cref="CompressedFileTransfer"/> class.
+/// </remarks>
+/// <param name="decoratedTransfer">The file transfer instance to decorate with compression functionality.</param>
+/// <exception cref="ArgumentNullException">Thrown when <paramref name="decoratedTransfer"/> is null.</exception>
+public class CompressedFileTransfer(FileTransfer decoratedTransfer) : FileTransfer
 {
-    private readonly FileTransfer _decoratedTransfer;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="CompressedFileTransfer"/> class.
-    /// </summary>
-    /// <param name="decoratedTransfer">The file transfer instance to decorate with compression functionality.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="decoratedTransfer"/> is null.</exception>
-    public CompressedFileTransfer(FileTransfer decoratedTransfer)
-    {
-        _decoratedTransfer = decoratedTransfer ?? throw new ArgumentNullException(nameof(decoratedTransfer));
-    }
+    private readonly FileTransfer _decoratedTransfer = decoratedTransfer
+        ?? throw new ArgumentNullException(nameof(decoratedTransfer));
 
     /// <summary>
     /// Transfers a file from source to destination with compression.

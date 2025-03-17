@@ -12,22 +12,19 @@ namespace SimpleFileTransfer.Core;
 /// In a real implementation, this would use an encryption library, but for simplicity,
 /// this implementation just copies the file.
 /// </remarks>
-public class EncryptedFileTransfer : FileTransfer
+/// <remarks>
+/// Initializes a new instance of the <see cref="EncryptedFileTransfer"/> class.
+/// </remarks>
+/// <param name="decoratedTransfer">The file transfer instance to decorate with encryption functionality.</param>
+/// <param name="password">The password to use for encryption.</param>
+/// <exception cref="ArgumentNullException">Thrown when <paramref name="decoratedTransfer"/> or <paramref name="password"/> is null.</exception>
+public class EncryptedFileTransfer(FileTransfer decoratedTransfer, string password) : FileTransfer
 {
-    private readonly FileTransfer _decoratedTransfer;
-    private readonly string _password;
+    private readonly FileTransfer _decoratedTransfer = decoratedTransfer
+        ?? throw new ArgumentNullException(nameof(decoratedTransfer));
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="EncryptedFileTransfer"/> class.
-    /// </summary>
-    /// <param name="decoratedTransfer">The file transfer instance to decorate with encryption functionality.</param>
-    /// <param name="password">The password to use for encryption.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="decoratedTransfer"/> or <paramref name="password"/> is null.</exception>
-    public EncryptedFileTransfer(FileTransfer decoratedTransfer, string password)
-    {
-        _decoratedTransfer = decoratedTransfer ?? throw new ArgumentNullException(nameof(decoratedTransfer));
-        _password = password ?? throw new ArgumentNullException(nameof(password));
-    }
+    private readonly string _password = password
+        ?? throw new ArgumentNullException(nameof(password));
 
     /// <summary>
     /// Transfers a file from source to destination with encryption.

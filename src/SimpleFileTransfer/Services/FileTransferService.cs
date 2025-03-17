@@ -25,24 +25,21 @@ public class FileTransferService : IFileTransferService
     /// <exception cref="FileNotFoundException">Thrown when the source file does not exist.</exception>
     public async Task TransferFileAsync(FileTransferOptions options)
     {
-        if (options == null)
-        {
-            throw new ArgumentNullException(nameof(options));
-        }
+        ArgumentNullException.ThrowIfNull(options);
 
         if (string.IsNullOrEmpty(options.SourcePath))
         {
-            throw new ArgumentException("Source path cannot be empty", nameof(options.SourcePath));
+            throw new ArgumentException(message: "Source path cannot be empty", paramName: nameof(options));
         }
 
         if (string.IsNullOrEmpty(options.DestinationPath))
         {
-            throw new ArgumentException("Destination path cannot be empty", nameof(options.DestinationPath));
+            throw new ArgumentException(message: "Destination path cannot be empty", paramName: nameof(options));
         }
 
         if (options.Encrypt && string.IsNullOrEmpty(options.Password))
         {
-            throw new ArgumentException("Password is required for encryption", nameof(options.Password));
+            throw new ArgumentException(message: "Password is required for encryption", paramName: nameof(options));
         }
 
         if (!File.Exists(options.SourcePath))
