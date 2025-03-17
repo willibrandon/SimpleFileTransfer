@@ -2,6 +2,8 @@ import { createContext, useState, useEffect, useContext } from 'react';
 
 // Available themes
 export const THEMES = {
+  TOKYO_NIGHT: 'tokyo-night',
+  TOKYO_LIGHT: 'tokyo-light',
   DARK: 'dark',
   LIGHT: 'light',
   HC_DARK: 'hc-dark',
@@ -20,13 +22,21 @@ export function ThemeProvider({ children }) {
       return savedTheme;
     }
     
-    // Check for system preference
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-      return THEMES.LIGHT;
+    // Check for high contrast preference
+    if (window.matchMedia && window.matchMedia('(prefers-contrast: more)').matches) {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        return THEMES.HC_LIGHT;
+      }
+      return THEMES.HC_DARK;
     }
     
-    // Default to dark theme
-    return THEMES.DARK;
+    // Check for system preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      return THEMES.TOKYO_LIGHT;
+    }
+    
+    // Default to Tokyo Night theme
+    return THEMES.TOKYO_NIGHT;
   };
 
   const [theme, setTheme] = useState(getInitialTheme);

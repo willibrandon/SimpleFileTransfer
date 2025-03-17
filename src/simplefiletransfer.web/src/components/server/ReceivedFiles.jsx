@@ -154,13 +154,13 @@ export function ReceivedFiles({ files = [], isLoading = false }) {
   // CSS styles for button states
   const styles = {
     loading: {
-      backgroundColor: '#f0ad4e'
+      backgroundColor: 'var(--warning)'
     },
     success: {
-      backgroundColor: '#5cb85c'
+      backgroundColor: 'var(--success-color)'
     },
     error: {
-      backgroundColor: '#d9534f'
+      backgroundColor: 'var(--error-color)'
     }
   };
   
@@ -216,7 +216,7 @@ export function ReceivedFiles({ files = [], isLoading = false }) {
           .file-name {
             font-weight: bold;
             font-size: 1rem;
-            color: var(--text-color);
+            color: var(--text);
           }
           
           .file-size {
@@ -229,7 +229,7 @@ export function ReceivedFiles({ files = [], isLoading = false }) {
             grid-template-columns: repeat(2, 1fr);
             gap: 0.5rem;
             font-size: 0.9rem;
-            color: var(--text-color);
+            color: var(--text);
             margin-bottom: 0.75rem;
           }
           
@@ -250,7 +250,7 @@ export function ReceivedFiles({ files = [], isLoading = false }) {
             border-radius: 4px;
             border: none;
             cursor: pointer;
-            color: white;
+            color: var(--bg);
           }
           
           .open-button {

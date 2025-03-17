@@ -1,30 +1,54 @@
-/* Default theme (Tokyo Night Dark) */
+/* Theme definitions */
 :root {
     color-scheme: dark light;
 
-    /* Dark theme (Tokyo Night) */
-    --bg-dark: #1a1b26;
-    --bg-highlight-dark: #1f2335;
-    --text-dark: #a9b1d6;
-    --dim-dark: #565f89;
-    --success-dark: #9ece6a;
-    --error-dark: #f7768e;
-    --info-dark: #7aa2f7;
-    --warning-dark: #e0af68;
-    --purple-dark: #bb9af7;
-    --cyan-dark: #7dcfff;
+    /* Tokyo Night theme */
+    --bg-tokyo-night: #1a1b26;
+    --bg-highlight-tokyo-night: #1f2335;
+    --text-tokyo-night: #a9b1d6;
+    --dim-tokyo-night: #565f89;
+    --success-tokyo-night: #9ece6a;
+    --error-tokyo-night: #f7768e;
+    --info-tokyo-night: #7aa2f7;
+    --warning-tokyo-night: #e0af68;
+    --purple-tokyo-night: #bb9af7;
+    --cyan-tokyo-night: #7dcfff;
 
-    /* Light theme */
+    /* Tokyo Light theme */
+    --bg-tokyo-light: #d5d6db;
+    --bg-highlight-tokyo-light: #cbccd1;
+    --text-tokyo-light: #343b58;
+    --dim-tokyo-light: #5c6773;
+    --success-tokyo-light: #485e30;
+    --error-tokyo-light: #8c4351;
+    --info-tokyo-light: #34548a;
+    --warning-tokyo-light: #8f5e15;
+    --purple-tokyo-light: #5a4a78;
+    --cyan-tokyo-light: #166775;
+
+    /* Dark theme (extremely dark) */
+    --bg-dark: #000000;
+    --bg-highlight-dark: #0a0a0a;
+    --text-dark: #777777;
+    --dim-dark: #444444;
+    --success-dark: #2e7d32;
+    --error-dark: #c62828;
+    --info-dark: #555555;
+    --warning-dark: #ef6c00;
+    --purple-dark: #6a1b9a;
+    --cyan-dark: #00838f;
+
+    /* Light theme (extremely light) */
     --bg-light: #ffffff;
-    --bg-highlight-light: #f5f5f5;
-    --text-light: #24292f;
-    --dim-light: #6e7781;
-    --success-light: #1a7f37;
-    --error-light: #cf222e;
-    --info-light: #0969da;
-    --warning-light: #9a6700;
-    --purple-light: #8250df;
-    --cyan-light: #1b7c83;
+    --bg-highlight-light: #f8f8f8;
+    --text-light: #333333;
+    --dim-light: #888888;
+    --success-light: #2e7d32;
+    --error-light: #c62828;
+    --info-light: #1565c0;
+    --warning-light: #ef6c00;
+    --purple-light: #6a1b9a;
+    --cyan-light: #00838f;
 
     /* High Contrast Dark */
     --bg-hc-dark: #000000;
@@ -50,32 +74,32 @@
     --purple-hc-light: #800080;
     --cyan-hc-light: #006666;
 
-    /* Default to dark theme */
-    --bg: var(--bg-dark);
-    --bg-highlight: var(--bg-highlight-dark);
-    --text: var(--text-dark);
-    --dim: var(--dim-dark);
-    --success: var(--success-dark);
-    --error: var(--error-dark);
-    --info: var(--info-dark);
-    --warning: var(--warning-dark);
-    --purple: var(--purple-dark);
-    --cyan: var(--cyan-dark);
+    /* Default to Tokyo Night theme */
+    --bg: var(--bg-tokyo-night);
+    --bg-highlight: var(--bg-highlight-tokyo-night);
+    --text: var(--text-tokyo-night);
+    --dim: var(--dim-tokyo-night);
+    --success: var(--success-tokyo-night);
+    --error: var(--error-tokyo-night);
+    --info: var(--info-tokyo-night);
+    --warning: var(--warning-tokyo-night);
+    --purple: var(--purple-tokyo-night);
+    --cyan: var(--cyan-tokyo-night);
 }
 
-/* Light mode */
+/* System preference for light mode */
 @media (prefers-color-scheme: light) {
     :root {
-        --bg: var(--bg-light);
-        --bg-highlight: var(--bg-highlight-light);
-        --text: var(--text-light);
-        --dim: var(--dim-light);
-        --success: var(--success-light);
-        --error: var(--error-light);
-        --info: var(--info-light);
-        --warning: var(--warning-light);
-        --purple: var(--purple-light);
-        --cyan: var(--cyan-light);
+        --bg: var(--bg-tokyo-light);
+        --bg-highlight: var(--bg-highlight-tokyo-light);
+        --text: var(--text-tokyo-light);
+        --dim: var(--dim-tokyo-light);
+        --success: var(--success-tokyo-light);
+        --error: var(--error-tokyo-light);
+        --info: var(--info-tokyo-light);
+        --warning: var(--warning-tokyo-light);
+        --purple: var(--purple-tokyo-light);
+        --cyan: var(--cyan-tokyo-light);
     }
 }
 
@@ -111,6 +135,32 @@
 }
 
 /* Manual theme selection */
+[data-theme="tokyo-night"] {
+    --bg: var(--bg-tokyo-night) !important;
+    --bg-highlight: var(--bg-highlight-tokyo-night) !important;
+    --text: var(--text-tokyo-night) !important;
+    --dim: var(--dim-tokyo-night) !important;
+    --success: var(--success-tokyo-night) !important;
+    --error: var(--error-tokyo-night) !important;
+    --info: var(--info-tokyo-night) !important;
+    --warning: var(--warning-tokyo-night) !important;
+    --purple: var(--purple-tokyo-night) !important;
+    --cyan: var(--cyan-tokyo-night) !important;
+}
+
+[data-theme="tokyo-light"] {
+    --bg: var(--bg-tokyo-light) !important;
+    --bg-highlight: var(--bg-highlight-tokyo-light) !important;
+    --text: var(--text-tokyo-light) !important;
+    --dim: var(--dim-tokyo-light) !important;
+    --success: var(--success-tokyo-light) !important;
+    --error: var(--error-tokyo-light) !important;
+    --info: var(--info-tokyo-light) !important;
+    --warning: var(--warning-tokyo-light) !important;
+    --purple: var(--purple-tokyo-light) !important;
+    --cyan: var(--cyan-tokyo-light) !important;
+}
+
 [data-theme="dark"] {
     --bg: var(--bg-dark) !important;
     --bg-highlight: var(--bg-highlight-dark) !important;

@@ -18,13 +18,195 @@ body {
   background-color: var(--bg);
 }
 
+/* Dark mode specific overrides */
+[data-theme="dark"] header h1,
+[data-theme="dark"] .client-view h1,
+[data-theme="dark"] .server-view h1,
+[data-theme="dark"] .file-transfer-form h2,
+[data-theme="dark"] .transfer-history h2,
+[data-theme="dark"] .queue-manager h2,
+[data-theme="dark"] .received-files h2,
+[data-theme="dark"] .send-file h2,
+[data-theme="dark"] .client-mode h2,
+[data-theme="dark"] .queue-manager h2 {
+  color: #777777; /* Dark gray for headings in dark mode - no blue */
+}
+
+/* Target all headings in dark mode */
+[data-theme="dark"] h1,
+[data-theme="dark"] h2 {
+  color: #777777 !important; /* Dark gray for all headings - no blue */
+}
+
+/* Dark mode checkbox styles */
+[data-theme="dark"] input[type="checkbox"] {
+  filter: invert(0.8) brightness(0.6) contrast(2);
+  border: 1px solid #333333;
+  background-color: #111111;
+}
+
+/* Dark mode file input styles */
+[data-theme="dark"] input[type="file"] {
+  color: #777777;
+}
+
+[data-theme="dark"] input[type="file"]::-webkit-file-upload-button {
+  background-color: #111111;
+  color: #777777;
+  border: 1px solid #333333;
+}
+
+[data-theme="dark"] input[type="file"]::file-selector-button {
+  background-color: #111111;
+  color: #777777;
+  border: 1px solid #333333;
+}
+
+/* Dark mode button styles */
+[data-theme="dark"] button {
+  background-color: #222222; /* Dark gray for buttons - no blue */
+}
+
+[data-theme="dark"] button:hover {
+  background-color: #333333; /* Slightly lighter on hover - no blue */
+}
+
+[data-theme="dark"] button:disabled {
+  background-color: #111111; /* Pure darkness */
+  color: #333333; /* Very dark gray text */
+  cursor: not-allowed;
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .refresh-button,
+[data-theme="dark"] .mode-button.active,
+[data-theme="dark"] .transfer-button,
+[data-theme="dark"] .retry-button {
+  background-color: #222222; /* Dark gray for active buttons - no blue */
+}
+
+/* Dark mode specific styles for action buttons */
+[data-theme="dark"] .start-button {
+  background-color: #111111; /* Pure darkness */
+  color: #555555; /* Dark gray text */
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .start-button:hover {
+  background-color: #181818; /* Slightly lighter on hover */
+  color: #666666;
+}
+
+[data-theme="dark"] .stop-button {
+  background-color: #111111; /* Pure darkness */
+  color: #555555; /* Dark gray text */
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .stop-button:hover {
+  background-color: #181818; /* Slightly lighter on hover */
+  color: #666666;
+}
+
+[data-theme="dark"] .clear-button {
+  background-color: #111111; /* Pure darkness */
+  color: #555555; /* Dark gray text */
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .clear-button:hover {
+  background-color: #181818; /* Slightly lighter on hover */
+  color: #666666;
+}
+
+/* Dark mode styles for server control buttons */
+[data-theme="dark"] .control-button {
+  background-color: #111111; /* Pure darkness */
+  color: #555555; /* Dark gray text */
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .control-button:hover {
+  background-color: #181818; /* Slightly lighter on hover */
+  color: #666666;
+}
+
+[data-theme="dark"] .control-button.start {
+  background-color: #111111; /* Pure darkness */
+  color: #555555; /* Dark gray text */
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .control-button.start:hover {
+  background-color: #181818; /* Slightly lighter on hover */
+  color: #666666;
+}
+
+[data-theme="dark"] .control-button.stop {
+  background-color: #111111; /* Pure darkness */
+  color: #555555; /* Dark gray text */
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .control-button.stop:hover {
+  background-color: #181818; /* Slightly lighter on hover */
+  color: #666666;
+}
+
+[data-theme="dark"] .save-button {
+  background-color: #111111; /* Pure darkness */
+  color: #555555; /* Dark gray text */
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .save-button:hover {
+  background-color: #181818; /* Slightly lighter on hover */
+  color: #666666;
+}
+
+/* Make Queue Manager buttons even darker in dark mode */
+[data-theme="dark"] .queue-buttons .start-button {
+  background-color: #111111; /* Pure darkness */
+  color: #555555; /* Dark gray text */
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .queue-buttons .start-button:hover {
+  background-color: #181818; /* Slightly lighter on hover, but still very dark */
+  color: #666666;
+}
+
+[data-theme="dark"] .queue-buttons .clear-button {
+  background-color: #111111; /* Pure darkness */
+  color: #555555; /* Dark gray text */
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .queue-buttons .clear-button:hover {
+  background-color: #181818; /* Slightly lighter on hover, but still very dark */
+  color: #666666;
+}
+
+/* Dark mode status colors */
+[data-theme="dark"] .status-completed {
+  color: #4caf50; /* Darker green for completed status */
+}
+
+[data-theme="dark"] .status-failed {
+  color: #f44336; /* Darker red for failed status */
+}
+
+[data-theme="dark"] .status-inprogress {
+  color: #555555; /* Dark gray for in-progress status */
+}
+
 .app-container {
   max-width: 1200px; /* Increased from 1000px to accommodate the content better */
   width: 100%;
   margin: 0 auto;
   padding: 0.5rem 2rem 2rem 2rem;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  color: var(--text-color);
+  color: var(--text);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -107,9 +289,15 @@ input[type="number"]:focus {
   height: 18px;
 }
 
+.checkbox-group label {
+  color: var(--text);
+  font-weight: normal;
+  margin-bottom: 0;
+}
+
 button {
   background-color: var(--primary-color);
-  color: white;
+  color: var(--bg);
   border: none;
   border-radius: 4px;
   padding: 0.75rem 1.5rem;
@@ -187,7 +375,7 @@ button:disabled {
 
 .mode-button.active {
   background-color: var(--primary-color);
-  color: white;
+  color: var(--bg);
   border-color: var(--primary-color);
 }
 
@@ -294,10 +482,12 @@ button:disabled {
 
 .control-button.start {
   background-color: var(--success-color);
+  color: var(--bg);
 }
 
 .control-button.stop {
   background-color: var(--error-color);
+  color: var(--bg);
 }
 
 .save-button {
@@ -370,6 +560,7 @@ button:disabled {
 
 .open-folder-button {
   background-color: var(--dim);
+  color: var(--bg);
 }
 
 .queue-buttons {
@@ -379,14 +570,17 @@ button:disabled {
 
 .start-button {
   background-color: var(--success-color);
+  color: var(--bg);
 }
 
 .stop-button {
   background-color: var(--error-color);
+  color: var(--bg);
 }
 
 .clear-button {
   background-color: var(--warning);
+  color: var(--bg);
 }
 
 .option {
@@ -561,17 +755,17 @@ footer {
 
 .toast-message.error {
   background-color: var(--error-color);
-  color: white;
+  color: var(--bg);
 }
 
 .toast-message.success {
   background-color: var(--success-color);
-  color: white;
+  color: var(--bg);
 }
 
 .toast-message.info {
   background-color: var(--primary-color);
-  color: white;
+  color: var(--bg);
 }
 
 /* Status message container with fixed height */
@@ -600,19 +794,19 @@ footer {
 
 .status-message.error {
   background-color: rgba(231, 76, 60, 0.1);
-  color: #e74c3c;
+  color: var(--error-color);
   border: 1px solid rgba(231, 76, 60, 0.3);
 }
 
 .status-message.success {
   background-color: rgba(46, 204, 113, 0.1);
-  color: #2ecc71;
+  color: var(--success-color);
   border: 1px solid rgba(46, 204, 113, 0.3);
 }
 
 .status-message.info {
   background-color: rgba(52, 152, 219, 0.1);
-  color: #3498db;
+  color: var(--info);
   border: 1px solid rgba(52, 152, 219, 0.3);
 }
 
@@ -658,4 +852,22 @@ footer {
   border: 1px solid var(--border-color);
   color: var(--primary-color);
   font-size: 1rem;
+}
+
+/* Dark mode theme indicator */
+[data-theme="dark"] #theme-indicator {
+  background-color: #111111;
+  color: #555555;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] #theme-indicator:hover {
+  color: #777777;
+}
+
+/* Make Transfer Now button darker in dark mode */
+[data-theme="dark"] .transfer-button {
+  background-color: #111111; /* Almost black */
+  color: #777777; /* Dark gray text */
+  border: 1px solid #333333; /* Dark border */
 }

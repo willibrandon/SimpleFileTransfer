@@ -155,7 +155,7 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
           .file-name {
             font-weight: bold;
             font-size: 1rem;
-            color: var(--text-color);
+            color: var(--text);
           }
           
           .file-size {
@@ -168,7 +168,7 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
             grid-template-columns: repeat(2, 1fr);
             gap: 0.5rem;
             font-size: 0.9rem;
-            color: var(--text-color);
+            color: var(--text);
             margin-bottom: 0.75rem;
           }
           
@@ -199,7 +199,7 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
             font-size: 0.8rem;
             min-width: 60px;
             background-color: var(--primary-color);
-            color: white;
+            color: var(--bg);
             border: none;
             border-radius: 4px;
             cursor: pointer;
