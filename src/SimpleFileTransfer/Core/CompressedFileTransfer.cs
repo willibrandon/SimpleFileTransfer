@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 
 namespace SimpleFileTransfer.Core;
 
@@ -9,8 +10,6 @@ namespace SimpleFileTransfer.Core;
 /// <remarks>
 /// This class implements the decorator pattern to add compression behavior to any <see cref="FileTransfer"/> instance.
 /// It compresses the source file before transferring it to the destination.
-/// In a real implementation, this would use a compression library, but for simplicity,
-/// this implementation just copies the file.
 /// </remarks>
 /// <remarks>
 /// Initializes a new instance of the <see cref="CompressedFileTransfer"/> class.
@@ -48,10 +47,9 @@ public class CompressedFileTransfer(FileTransfer decoratedTransfer) : FileTransf
             // Compress the source file to the temp file
             using (var sourceStream = File.OpenRead(sourcePath))
             using (var tempStream = File.Create(tempFile))
+            using (var gzipStream = new GZipStream(tempStream, CompressionLevel.Optimal))
             {
-                // In a real implementation, we would use a compression library here
-                // For simplicity, we're just copying the file
-                sourceStream.CopyTo(tempStream);
+                sourceStream.CopyTo(gzipStream);
             }
 
             // Transfer the compressed file to the destination
