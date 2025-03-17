@@ -29,6 +29,18 @@ public class ServerController : ControllerBase
     private static readonly List<ReceivedFileInfo> _receivedFiles = new();
 
     /// <summary>
+    /// Gets the list of received files.
+    /// </summary>
+    /// <returns>The list of received files.</returns>
+    public static List<ReceivedFileInfo> GetReceivedFiles()
+    {
+        // Filter out any invalid entries
+        return _receivedFiles
+            .Where(f => !string.IsNullOrEmpty(f.FileName) && f.Size > 0 && !string.IsNullOrEmpty(f.Id))
+            .ToList();
+    }
+
+    /// <summary>
     /// Gets the current status of the file transfer server.
     /// </summary>
     /// <returns>The server status.</returns>
@@ -49,81 +61,103 @@ public class ServerController : ControllerBase
     [HttpPost("start")]
     public async Task<IActionResult> StartServer([FromBody] ServerConfig? config = null)
     {
+        // If the server is already running, return success
         if (_server != null && _serverCts != null && !_serverCts.IsCancellationRequested)
         {
-            return BadRequest(new { error = "Server is already running" });
+            return Ok(new { isRunning = true, port = _config.Port });
         }
-
+        
+        // Update the configuration if provided
+        if (config != null)
+        {
+            _config = config;
+        }
+        
+        // Create a new cancellation token source
+        _serverCts = new CancellationTokenSource();
+        
         try
         {
-            // Update config if provided
-            if (config != null)
-            {
-                _config = config;
-            }
-
             // Ensure downloads directory is not empty
             if (string.IsNullOrWhiteSpace(_config.DownloadsDirectory))
             {
                 _config.DownloadsDirectory = Program.DownloadsDirectory;
             }
-
-            // Create downloads directory
-            Directory.CreateDirectory(_config.DownloadsDirectory);
-
-            // Start the server
-            _serverCts = new CancellationTokenSource();
-            _server = new FileTransferServer(
-                _config.DownloadsDirectory,
-                _config.Port,
-                _config.UseEncryption ? _config.Password : null,
-                _serverCts.Token);
-
-            // Subscribe to file received event
-            _server.FileReceived += OnFileReceived;
             
-            // Initialize WebSocket server
-            WebSocketServer.Initialize(_server);
-
-            // Start the server in a background task
-            await Task.Run(() =>
+            Console.WriteLine($"Starting server with downloads directory: {_config.DownloadsDirectory}");
+            
+            // Create the downloads directory if it doesn't exist
+            if (!Directory.Exists(_config.DownloadsDirectory))
             {
                 try
                 {
-                    _server.Start();
+                    Directory.CreateDirectory(_config.DownloadsDirectory);
+                    Console.WriteLine($"Created downloads directory: {_config.DownloadsDirectory}");
                 }
-                catch (OperationCanceledException)
+                catch (Exception dirEx)
                 {
-                    // Expected when cancellation is requested
+                    Console.WriteLine($"Error creating downloads directory: {dirEx.Message}");
+                    throw new Exception($"Could not create downloads directory: {dirEx.Message}", dirEx);
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Server error: {ex.Message}");
-                }
-            });
+            }
             
-            // Broadcast server started event
-            await WebSocketServer.BroadcastEventAsync(new WebSocketEvent
+            // Create and start the server
+            try
             {
-                Type = "server_started",
-                Data = new
+                _server = new FileTransferServer(
+                    _config.DownloadsDirectory,
+                    _config.Port,
+                    _config.UseEncryption ? _config.Password : null,
+                    _serverCts.Token);
+                
+                Console.WriteLine("FileTransferServer instance created successfully");
+                
+                // Subscribe to the FileReceived event
+                _server.FileReceived += OnFileReceived;
+                
+                // Start the server
+                _server.Start();
+                Console.WriteLine($"Server started on port {_config.Port}");
+                
+                // Initialize the WebSocket server
+                WebSocketServer.Initialize(_server);
+                Console.WriteLine("WebSocketServer initialized");
+                
+                // Broadcast the server status
+                await WebSocketServer.BroadcastEventAsync(new WebSocketEvent
                 {
-                    Port = _config.Port,
-                    DownloadsDirectory = _config.DownloadsDirectory,
-                    UseEncryption = _config.UseEncryption,
-                    StartedAt = DateTime.Now
-                }
-            });
-
-            return Ok(new
+                    Type = "server_started",
+                    Data = new { port = _config.Port }
+                });
+                
+                // Broadcast the current list of received files
+                await WebSocketServer.BroadcastEventAsync(new WebSocketEvent
+                {
+                    Type = "received_files",
+                    Data = _receivedFiles.Where(f => !string.IsNullOrEmpty(f.FileName) && f.Size > 0).ToList()
+                });
+                
+                return Ok(new { isRunning = true, port = _config.Port });
+            }
+            catch (Exception serverEx)
             {
-                message = $"Server started on port {_config.Port}",
-                config = _config
-            });
+                Console.WriteLine($"Error creating or starting server: {serverEx.Message}");
+                Console.WriteLine($"Stack trace: {serverEx.StackTrace}");
+                throw new Exception($"Error starting server: {serverEx.Message}", serverEx);
+            }
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = ex.Message });
+            // Clean up if an error occurs
+            _server?.Stop();
+            _server = null;
+            _serverCts?.Cancel();
+            _serverCts = null;
+            
+            Console.WriteLine($"Server start failed: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            
+            return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
         }
     }
 
@@ -219,7 +253,12 @@ public class ServerController : ControllerBase
     [HttpGet("files")]
     public IActionResult GetFiles()
     {
-        return Ok(new { files = _receivedFiles });
+        // Filter out any invalid entries
+        var validFiles = _receivedFiles
+            .Where(f => !string.IsNullOrEmpty(f.FileName) && f.Size > 0 && !string.IsNullOrEmpty(f.Id))
+            .ToList();
+            
+        return Ok(new { files = validFiles });
     }
 
     /// <summary>
@@ -245,11 +284,59 @@ public class ServerController : ControllerBase
         return PhysicalFile(file.FilePath, "application/octet-stream", file.FileName);
     }
 
+    /// <summary>
+    /// Opens a folder in the system's file explorer.
+    /// </summary>
+    /// <param name="request">The request containing the folder path.</param>
+    /// <returns>The result of the operation.</returns>
+    [HttpPost("open-folder")]
+    public IActionResult OpenFolder([FromBody] OpenFolderRequest request)
+    {
+        if (string.IsNullOrEmpty(request.Path))
+        {
+            return BadRequest(new { error = "Path is required" });
+        }
+        
+        if (!Directory.Exists(request.Path))
+        {
+            return NotFound(new { error = $"Directory not found: {request.Path}" });
+        }
+        
+        try
+        {
+            // Open the folder using the system's default file explorer
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = request.Path,
+                UseShellExecute = true
+            };
+            
+            System.Diagnostics.Process.Start(startInfo);
+            
+            return Ok(new { message = $"Folder opened: {request.Path}" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = $"Failed to open folder: {ex.Message}" });
+        }
+    }
+
     private static async void OnFileReceived(object? sender, FileReceivedEventArgs e)
     {
         try
         {
+            if (string.IsNullOrEmpty(e.FilePath) || !System.IO.File.Exists(e.FilePath))
+            {
+                Console.WriteLine($"Error processing received file: File path is invalid or file does not exist: {e.FilePath}");
+                return;
+            }
+            
             var fileInfo = new FileInfo(e.FilePath);
+            if (!fileInfo.Exists || fileInfo.Length == 0)
+            {
+                Console.WriteLine($"Error processing received file: File is empty or does not exist: {e.FilePath}");
+                return;
+            }
             
             var receivedFile = new ReceivedFileInfo
             {
@@ -262,13 +349,46 @@ public class ServerController : ControllerBase
                 Sender = e.SenderIp ?? "Unknown"
             };
             
+            // Check if this is a duplicate
+            var existingFile = _receivedFiles.FirstOrDefault(f => 
+                f.FilePath == receivedFile.FilePath && 
+                f.Size == receivedFile.Size);
+                
+            if (existingFile != null)
+            {
+                Console.WriteLine($"Duplicate file detected, not adding to received files list: {receivedFile.FileName}");
+                return;
+            }
+            
             _receivedFiles.Add(receivedFile);
             
-            // Broadcast file received event
+            Console.WriteLine($"File received: {receivedFile.FileName}, Size: {receivedFile.Size} bytes, From: {receivedFile.Sender}");
+            
+            // Broadcast file received event with complete file data
             await WebSocketServer.BroadcastEventAsync(new WebSocketEvent
             {
                 Type = "file_received",
-                Data = receivedFile
+                Data = new
+                {
+                    id = receivedFile.Id,
+                    fileName = receivedFile.FileName,
+                    filePath = receivedFile.FilePath,
+                    directory = receivedFile.Directory,
+                    size = receivedFile.Size,
+                    receivedDate = receivedFile.ReceivedDate,
+                    sender = receivedFile.Sender
+                }
+            });
+            
+            // Also broadcast the updated list of files
+            var validFiles = _receivedFiles
+                .Where(f => !string.IsNullOrEmpty(f.FileName) && f.Size > 0 && !string.IsNullOrEmpty(f.Id))
+                .ToList();
+                
+            await WebSocketServer.BroadcastEventAsync(new WebSocketEvent
+            {
+                Type = "received_files",
+                Data = validFiles
             });
         }
         catch (Exception ex)
@@ -343,4 +463,15 @@ public class ReceivedFileInfo
     /// Gets or sets the IP address of the sender.
     /// </summary>
     public string Sender { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Represents a request to open a folder.
+/// </summary>
+public class OpenFolderRequest
+{
+    /// <summary>
+    /// Gets or sets the path to the folder to open.
+    /// </summary>
+    public string Path { get; set; } = string.Empty;
 } 

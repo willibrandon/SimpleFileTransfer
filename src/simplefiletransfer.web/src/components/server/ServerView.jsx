@@ -6,6 +6,11 @@ import { useWebSocket } from '../../WebSocketContext'
 export function ServerView() {
   const { serverStatus, receivedFiles } = useWebSocket()
   
+  // Log received files for debugging
+  useEffect(() => {
+    console.log('ServerView receivedFiles:', receivedFiles);
+  }, [receivedFiles]);
+  
   return (
     <div className="server-view">
       <h1>Server Mode</h1>

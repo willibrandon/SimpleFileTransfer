@@ -6,12 +6,6 @@ const WebSocketContext = createContext(null);
 // Custom hook to use the WebSocket context
 export const useWebSocket = () => useContext(WebSocketContext);
 
-// Silent logger function that does nothing in production
-const logger = {
-  log: process.env.NODE_ENV === 'development' ? console.log : () => {},
-  error: process.env.NODE_ENV === 'development' ? console.error : () => {}
-};
-
 // WebSocket provider component
 export function WebSocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
@@ -50,7 +44,15 @@ export function WebSocketProvider({ children }) {
       // Reset reconnection attempts on successful connection
       reconnectAttempts.current = 0;
       setConnected(true);
-      logger.log('WebSocket connected');
+      console.log('WebSocket connected');
+      
+      // Request initial data
+      setTimeout(() => {
+        if (newSocket.readyState === WebSocket.OPEN) {
+          newSocket.send(JSON.stringify({ type: 'get_server_status' }));
+          newSocket.send(JSON.stringify({ type: 'get_received_files' }));
+        }
+      }, 500);
     };
     
     newSocket.onclose = (event) => {
@@ -58,7 +60,7 @@ export function WebSocketProvider({ children }) {
       
       // Don't log normal closures
       if (event.code !== 1000) {
-        logger.log('WebSocket disconnected, will attempt to reconnect...');
+        console.log('WebSocket disconnected, will attempt to reconnect...');
       }
       
       // Attempt to reconnect with exponential backoff
@@ -80,7 +82,7 @@ export function WebSocketProvider({ children }) {
     newSocket.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data);
-        logger.log('WebSocket event:', event);
+        console.log('WebSocket event:', event);
         
         // Add the event to the events list
         setEvents(prev => [...prev, event]);
@@ -88,7 +90,7 @@ export function WebSocketProvider({ children }) {
         // Handle specific event types
         handleEvent(event);
       } catch (error) {
-        logger.error('Error parsing WebSocket message:', error);
+        console.error('Error parsing WebSocket message:', error);
       }
     };
     
@@ -116,6 +118,24 @@ export function WebSocketProvider({ children }) {
     };
   }, []);
   
+  // Process file data to ensure it's valid
+  const processFileData = (file) => {
+    if (!file) return null;
+    
+    // Generate an ID if one doesn't exist
+    const id = file.id || `file-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
+    return {
+      id: id,
+      fileName: file.fileName || 'Unknown',
+      filePath: file.filePath || '',
+      directory: file.directory || (file.filePath ? file.filePath.substring(0, file.filePath.lastIndexOf('\\')) : ''),
+      size: typeof file.size === 'number' ? file.size : 0,
+      sender: file.sender || 'Unknown',
+      receivedDate: file.receivedDate || new Date().toISOString()
+    };
+  };
+  
   // Handle WebSocket events
   const handleEvent = (event) => {
     switch (event.type) {
@@ -134,30 +154,39 @@ export function WebSocketProvider({ children }) {
       case 'received_files':
         // Handle initial list of received files
         if (Array.isArray(event.data)) {
-          // Use the server's file IDs directly
-          const formattedFiles = event.data.map(file => ({
-            id: file.id,
-            fileName: file.fileName || 'Unknown',
-            size: file.size || 0,
-            sender: file.sender || 'Unknown',
-            receivedDate: file.receivedDate || new Date().toISOString(),
-            directory: file.directory || null
-          }));
-          setReceivedFiles(formattedFiles);
+          // Filter out invalid files and process the data
+          const validFiles = event.data
+            .filter(file => file && file.fileName && file.size > 0)
+            .map(processFileData)
+            .filter(Boolean);
+            
+            console.log('Received files list:', validFiles);
+            if (validFiles.length > 0) {
+              setReceivedFiles(validFiles);
+            }
         }
         break;
         
       case 'file_received':
-        // Use the server's file ID directly
-        const fileData = {
-          id: event.data.id,
-          fileName: event.data.fileName || 'Unknown',
-          size: event.data.size || 0,
-          sender: event.data.sender || 'Unknown',
-          receivedDate: event.data.receivedDate || new Date().toISOString(),
-          directory: event.data.directory || null
-        };
-        setReceivedFiles(prev => [...prev, fileData]);
+        // Process the file data
+        const fileData = processFileData(event.data);
+        
+        if (fileData && fileData.fileName && fileData.size > 0) {
+          console.log('Received new file:', fileData);
+          
+          // Check if this file already exists in the list by comparing filePath
+          setReceivedFiles(prev => {
+            const exists = prev.some(f => 
+              f.filePath === fileData.filePath && 
+              f.size === fileData.size
+            );
+            
+            if (exists) {
+              return prev; // File already exists, don't add it again
+            }
+            return [...prev, fileData];
+          });
+        }
         break;
         
       case 'transfer_started':
@@ -224,7 +253,7 @@ export function WebSocketProvider({ children }) {
     if (socket && connected) {
       socket.send(JSON.stringify(message));
     } else {
-      logger.error('Cannot send message: WebSocket not connected');
+      console.error('Cannot send message: WebSocket not connected');
     }
   };
   

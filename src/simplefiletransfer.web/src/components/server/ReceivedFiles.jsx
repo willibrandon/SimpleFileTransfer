@@ -1,13 +1,30 @@
-import { useState } from 'react'
-
-// Silent logger function that does nothing in production
-const logger = {
-  log: process.env.NODE_ENV === 'development' ? console.log : () => {},
-  error: process.env.NODE_ENV === 'development' ? console.error : () => {}
-};
+import { useState, useEffect } from 'react'
 
 export function ReceivedFiles({ files = [] }) {
   const [downloadStatus, setDownloadStatus] = useState({});
+  const [validFiles, setValidFiles] = useState([]);
+  
+  // Process files to ensure they have valid data
+  useEffect(() => {
+    console.log('ReceivedFiles component received files:', files);
+    
+    if (!Array.isArray(files)) {
+      console.error('ReceivedFiles: files prop is not an array', files);
+      setValidFiles([]);
+      return;
+    }
+    
+    // Filter out invalid files
+    const filtered = files.filter(file => 
+      file && 
+      file.id && 
+      file.fileName && 
+      file.size > 0
+    );
+    
+    console.log('ReceivedFiles filtered valid files:', filtered);
+    setValidFiles(filtered);
+  }, [files]);
 
   const formatFileSize = (bytes) => {
     if (bytes === undefined || bytes === null || bytes === 0) return '0 Bytes'
@@ -27,14 +44,14 @@ export function ReceivedFiles({ files = [] }) {
       if (isNaN(date.getTime())) return 'Invalid Date'
       return date.toLocaleString()
     } catch (error) {
-      logger.error('Error formatting date:', error)
+      console.error('Error formatting date:', error)
       return 'Invalid Date'
     }
   }
   
   const openFile = async (fileId) => {
     if (!fileId) {
-      logger.error('Cannot open file: Missing file ID')
+      console.error('Cannot open file: Missing file ID')
       return
     }
     
@@ -45,15 +62,18 @@ export function ReceivedFiles({ files = [] }) {
       // Set download status to loading
       setDownloadStatus(prev => ({ ...prev, [fileId]: 'loading' }))
       
-      // Check if the file exists first
-      const response = await fetch(downloadUrl, { method: 'HEAD' })
+      // Create a hidden anchor element to trigger the download
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
       
-      if (!response.ok) {
-        throw new Error(`File not found (${response.status})`)
-      }
+      // Append to the document and click
+      document.body.appendChild(link)
+      link.click()
       
-      // If the file exists, open it in a new window
-      window.open(downloadUrl)
+      // Clean up
+      document.body.removeChild(link)
       
       // Set download status to success
       setDownloadStatus(prev => ({ ...prev, [fileId]: 'success' }))
@@ -67,7 +87,7 @@ export function ReceivedFiles({ files = [] }) {
         })
       }, 3000)
     } catch (error) {
-      logger.error(`Error downloading file: ${error.message}`)
+      console.error(`Error downloading file: ${error.message}`)
       
       // Set download status to error
       setDownloadStatus(prev => ({ ...prev, [fileId]: 'error' }))
@@ -83,16 +103,30 @@ export function ReceivedFiles({ files = [] }) {
     }
   }
   
-  const openFolder = (directory) => {
+  const openFolder = async (directory) => {
     if (!directory) {
-      logger.error('Cannot open folder: Missing directory path')
+      console.error('Cannot open folder: Missing directory path')
       return
     }
     
     try {
-      window.open(`file://${directory}`)
+      // Use the API to open the folder instead of trying to use file:// protocol
+      const response = await fetch('/api/server/open-folder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ path: directory })
+      })
+      
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to open folder')
+      }
+      
+      // Success - no need to do anything else
     } catch (error) {
-      logger.error('Error opening folder:', error)
+      console.error('Error opening folder:', error)
       alert('Could not open folder: ' + error.message)
     }
   }
@@ -143,7 +177,7 @@ export function ReceivedFiles({ files = [] }) {
     <div className="received-files">
       <h2>Received Files</h2>
       
-      {!files || files.length === 0 ? (
+      {!validFiles || validFiles.length === 0 ? (
         <div className="no-files">No files received yet</div>
       ) : (
         <table className="files-table">
@@ -157,18 +191,18 @@ export function ReceivedFiles({ files = [] }) {
             </tr>
           </thead>
           <tbody>
-            {files.map((file, index) => (
-              <tr key={file.id || `file-${index}`}>
-                <td>{file.fileName || 'Unknown'}</td>
+            {validFiles.map((file) => (
+              <tr key={file.id}>
+                <td>{file.fileName}</td>
                 <td>{formatFileSize(file.size)}</td>
-                <td>{file.sender || 'Unknown'}</td>
+                <td>{file.sender}</td>
                 <td>{formatDate(file.receivedDate)}</td>
                 <td>
                   <button 
                     className={getButtonClass(file.id)}
                     style={getButtonStyle(file.id)}
                     onClick={() => openFile(file.id)}
-                    disabled={!file.id || downloadStatus[file.id] === 'loading'}
+                    disabled={downloadStatus[file.id] === 'loading'}
                   >
                     {getButtonText(file.id)}
                   </button>

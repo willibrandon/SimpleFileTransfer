@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Http;
+using SimpleFileTransfer.Controllers;
 using SimpleFileTransfer.Transfer;
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
@@ -220,18 +222,45 @@ public class WebSocketServer
     /// <param name="e">The event data.</param>
     private static async void OnFileReceived(object? sender, FileReceivedEventArgs e)
     {
-        await BroadcastEventAsync(new WebSocketEvent
+        try
         {
-            Type = "file_received",
-            Data = new
+            if (string.IsNullOrEmpty(e.FilePath) || !System.IO.File.Exists(e.FilePath))
             {
+                Console.WriteLine($"Error processing received file: File path is invalid or file does not exist: {e.FilePath}");
+                return;
+            }
+            
+            var fileInfo = new FileInfo(e.FilePath);
+            if (!fileInfo.Exists || fileInfo.Length == 0)
+            {
+                Console.WriteLine($"Error processing received file: File is empty or does not exist: {e.FilePath}");
+                return;
+            }
+            
+            var receivedFile = new
+            {
+                Id = Guid.NewGuid().ToString(),
                 FileName = Path.GetFileName(e.FilePath),
                 FilePath = e.FilePath,
-                Size = e.OriginalSize,
-                Sender = e.SenderIp ?? "Unknown",
-                ReceivedDate = DateTime.Now
-            }
-        });
+                Directory = Path.GetDirectoryName(e.FilePath) ?? string.Empty,
+                Size = fileInfo.Length,
+                ReceivedDate = DateTime.Now,
+                Sender = e.SenderIp ?? "Unknown"
+            };
+            
+            Console.WriteLine($"File received: {receivedFile.FileName}, Size: {receivedFile.Size} bytes, From: {receivedFile.Sender}");
+            
+            // Broadcast file received event
+            await BroadcastEventAsync(new WebSocketEvent
+            {
+                Type = "file_received",
+                Data = receivedFile
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing received file: {ex.Message}");
+        }
     }
 
     public static async Task RemoveClientAsync(string clientId)
@@ -270,16 +299,14 @@ public class WebSocketServer
             }
         });
         
-        // Send received files list if available
-        if (_fileTransferServer != null)
+        // Get the received files from the ServerController
+        var receivedFiles = ServerController.GetReceivedFiles();
+        
+        // Send received files list
+        await SendEventAsync(socket, new WebSocketEvent
         {
-            // You would need to implement this based on how you store received files
-            // This is just a placeholder
-            await SendEventAsync(socket, new WebSocketEvent
-            {
-                Type = "received_files",
-                Data = new object[] { /* List of received files */ }
-            });
-        }
+            Type = "received_files",
+            Data = receivedFiles
+        });
     }
 } 

@@ -44,6 +44,9 @@ public class ClientController : ControllerBase
         
         try
         {
+            // Get the original filename
+            var originalFileName = request.FileName ?? request.File.FileName;
+            
             // Create a temporary file
             var tempFile = Path.GetTempFileName();
             
@@ -63,14 +66,11 @@ public class ClientController : ControllerBase
                 request.Password,
                 request.ResumeEnabled);
             
-            // Send the file
-            var fileName = request.FileName ?? request.File.FileName;
-            
             // Add to history
             var historyItem = new TransferHistoryItem
             {
                 Id = Guid.NewGuid().ToString(),
-                FileName = fileName,
+                FileName = originalFileName,
                 Host = request.Host,
                 Port = request.Port,
                 Size = request.File.Length,
@@ -94,7 +94,22 @@ public class ClientController : ControllerBase
             {
                 try
                 {
-                    client.SendFile(tempFile);
+                    // Create a temporary file with the correct extension
+                    var tempFileWithExt = Path.Combine(
+                        Path.GetDirectoryName(tempFile) ?? string.Empty,
+                        originalFileName);
+                    
+                    // If a file with this name already exists, delete it
+                    if (System.IO.File.Exists(tempFileWithExt))
+                    {
+                        System.IO.File.Delete(tempFileWithExt);
+                    }
+                    
+                    // Rename the temp file to have the correct filename
+                    System.IO.File.Move(tempFile, tempFileWithExt);
+                    
+                    // Send the file with the correct filename
+                    client.SendFile(tempFileWithExt);
                     
                     // Update history
                     historyItem.EndTime = DateTime.Now;
@@ -106,6 +121,19 @@ public class ClientController : ControllerBase
                         Type = "transfer_completed",
                         Data = historyItem
                     });
+                    
+                    // Clean up the temporary file
+                    try
+                    {
+                        if (System.IO.File.Exists(tempFileWithExt))
+                        {
+                            System.IO.File.Delete(tempFileWithExt);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error cleaning up temporary file: {ex.Message}");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -120,9 +148,7 @@ public class ClientController : ControllerBase
                         Type = "transfer_failed",
                         Data = historyItem
                     });
-                }
-                finally
-                {
+                    
                     // Clean up the temporary file
                     try
                     {
@@ -133,16 +159,12 @@ public class ClientController : ControllerBase
                     }
                     catch
                     {
-                        // Ignore errors during cleanup
+                        // Ignore cleanup errors
                     }
                 }
             });
             
-            return Ok(new
-            {
-                message = "File transfer started",
-                transferId = historyItem.Id
-            });
+            return Ok(new { message = "File transfer initiated", id = historyItem.Id });
         }
         catch (Exception ex)
         {
@@ -165,6 +187,9 @@ public class ClientController : ControllerBase
         
         try
         {
+            // Get the original filename
+            var originalFileName = request.FileName ?? request.File.FileName;
+            
             // Create a temporary file
             var tempFile = Path.GetTempFileName();
             
@@ -174,11 +199,24 @@ public class ClientController : ControllerBase
                 await request.File.CopyToAsync(stream);
             }
             
+            // Create a temporary file with the correct extension
+            var tempFileWithExt = Path.Combine(
+                Path.GetDirectoryName(tempFile) ?? string.Empty,
+                originalFileName);
+            
+            // If a file with this name already exists, delete it
+            if (System.IO.File.Exists(tempFileWithExt))
+            {
+                System.IO.File.Delete(tempFileWithExt);
+            }
+            
+            // Rename the temp file to have the correct filename
+            System.IO.File.Move(tempFile, tempFileWithExt);
+            
             // Create a queued transfer
-            var fileName = request.FileName ?? request.File.FileName;
             var transfer = new QueuedFileTransfer(
                 request.Host,
-                tempFile,
+                tempFileWithExt,
                 request.UseCompression,
                 request.CompressionAlgorithm,
                 request.UseEncryption,
@@ -192,7 +230,7 @@ public class ClientController : ControllerBase
             var historyItem = new TransferHistoryItem
             {
                 Id = Guid.NewGuid().ToString(),
-                FileName = fileName,
+                FileName = originalFileName,
                 Host = request.Host,
                 Port = request.Port,
                 Size = request.File.Length,
@@ -204,29 +242,24 @@ public class ClientController : ControllerBase
             
             _history.Add(historyItem);
             
-            // Associate the history item with the transfer
-            transfer.UserData = historyItem;
-            
-            // Broadcast the new queue item
+            // Broadcast the new history item
             await WebSocketServer.BroadcastEventAsync(new WebSocketEvent
             {
                 Type = "transfer_queued",
                 Data = new
                 {
-                    Id = historyItem.Id,
-                    FileName = fileName,
-                    Host = request.Host,
-                    Port = request.Port,
-                    Size = request.File.Length,
-                    QueuedAt = DateTime.Now
+                    id = historyItem.Id,
+                    fileName = historyItem.FileName,
+                    host = historyItem.Host,
+                    port = historyItem.Port,
+                    size = historyItem.Size,
+                    queuedAt = historyItem.StartTime,
+                    useCompression = historyItem.UseCompression,
+                    useEncryption = historyItem.UseEncryption
                 }
             });
             
-            return Ok(new
-            {
-                message = "File added to queue",
-                queueId = historyItem.Id
-            });
+            return Ok(new { message = "File added to queue", id = historyItem.Id });
         }
         catch (Exception ex)
         {
