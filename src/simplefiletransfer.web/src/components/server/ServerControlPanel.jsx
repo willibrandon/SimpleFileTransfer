@@ -37,6 +37,7 @@ export function ServerControlPanel({ isRunning, port }) {
   const [localIsRunning, setLocalIsRunning] = useState(isRunning)
   const [isInitialized, setIsInitialized] = useState(false)
   const [currentPort, setCurrentPort] = useState(port || 9876)
+  const [ipAddress, setIpAddress] = useState('')
   
   const { connected, serverStatus } = useWebSocket()
   
@@ -51,6 +52,39 @@ export function ServerControlPanel({ isRunning, port }) {
       setCurrentPort(serverStatus.port);
     }
   }, [serverStatus]);
+  
+  // Get IP address when server is running
+  useEffect(() => {
+    const getIpAddress = async () => {
+      try {
+        // Try to get IP from the server API first
+        const response = await fetch('/api/server/ip');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.ip) {
+            setIpAddress(data.ip);
+            return;
+          }
+        }
+        
+        // Fallback to a public service that returns the client's IP
+        const publicIpResponse = await fetch('https://api.ipify.org?format=json');
+        if (publicIpResponse.ok) {
+          const data = await publicIpResponse.json();
+          setIpAddress(data.ip);
+        }
+      } catch (error) {
+        console.warn('Could not get IP address:', error);
+        setIpAddress('Could not determine IP address');
+      }
+    };
+    
+    if (localIsRunning) {
+      getIpAddress();
+    } else {
+      setIpAddress('');
+    }
+  }, [localIsRunning]);
   
   // Check server status on initial load
   useEffect(() => {
@@ -274,8 +308,12 @@ export function ServerControlPanel({ isRunning, port }) {
       
       {displayIsRunning && (
         <div className="server-info">
-          <p>Server is running on port {currentPort}</p>
-          <p>Share your IP address with others to receive files</p>
+          {ipAddress ? (
+            <p className="server-address">Server is running at <strong>{ipAddress}:{currentPort}</strong></p>
+          ) : (
+            <p>Server is running on port {currentPort}</p>
+          )}
+          <p>Share this address with others to receive files</p>
         </div>
       )}
       

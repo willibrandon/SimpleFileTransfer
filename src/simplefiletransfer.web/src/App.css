@@ -634,3 +634,28 @@ footer {
 .queue-manager {
   margin-top: 1.5rem;
 }
+
+.server-info {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.server-info p {
+  margin: 0.5rem 0;
+}
+
+.server-address {
+  font-size: 1.1rem;
+  margin: 0.75rem 0;
+}
+
+.server-address strong {
+  display: inline-block;
+  background-color: var(--bg-highlight);
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-family: monospace;
+  border: 1px solid var(--border-color);
+  color: var(--primary-color);
+  font-size: 1rem;
+}

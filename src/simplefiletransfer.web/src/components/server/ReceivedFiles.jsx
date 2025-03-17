@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-export function ReceivedFiles({ files = [] }) {
+export function ReceivedFiles({ files = [], isLoading = false }) {
   const [downloadStatus, setDownloadStatus] = useState({});
   const [validFiles, setValidFiles] = useState([]);
   
@@ -173,6 +173,16 @@ export function ReceivedFiles({ files = [] }) {
     return {};
   };
   
+  // Render loading state
+  if (isLoading && (!validFiles || validFiles.length === 0)) {
+    return (
+      <div className="received-files">
+        <h2>Received Files</h2>
+        <div className="loading">Loading files...</div>
+      </div>
+    );
+  }
+  
   return (
     <div className="received-files">
       <h2>Received Files</h2>
@@ -195,7 +205,7 @@ export function ReceivedFiles({ files = [] }) {
               <tr key={file.id}>
                 <td>{file.fileName}</td>
                 <td>{formatFileSize(file.size)}</td>
-                <td>{file.sender}</td>
+                <td>{file.sender || 'Unknown'}</td>
                 <td>{formatDate(file.receivedDate)}</td>
                 <td>
                   <div className="action-buttons">
