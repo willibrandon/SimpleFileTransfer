@@ -47,9 +47,13 @@ public class ServerController : ControllerBase
     [HttpGet("status")]
     public IActionResult GetStatus()
     {
+        bool isRunning = _server != null && _serverCts != null && !_serverCts.IsCancellationRequested;
+        int port = isRunning ? _config.Port : 0;
+        
         return Ok(new
         {
-            IsRunning = _server != null && _serverCts != null && !_serverCts.IsCancellationRequested
+            isRunning = isRunning,
+            port = port
         });
     }
 

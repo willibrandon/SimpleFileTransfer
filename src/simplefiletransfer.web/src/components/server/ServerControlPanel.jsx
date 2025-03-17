@@ -36,6 +36,7 @@ export function ServerControlPanel({ isRunning, port }) {
   const [statusMessage, setStatusMessage] = useState({ type: '', message: '' })
   const [localIsRunning, setLocalIsRunning] = useState(isRunning)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [currentPort, setCurrentPort] = useState(port || 9876)
   
   const { connected, serverStatus } = useWebSocket()
   
@@ -44,20 +45,44 @@ export function ServerControlPanel({ isRunning, port }) {
     setLocalIsRunning(isRunning);
   }, [isRunning]);
   
+  // Update port from serverStatus
+  useEffect(() => {
+    if (serverStatus && serverStatus.port) {
+      setCurrentPort(serverStatus.port);
+    }
+  }, [serverStatus]);
+  
   // Check server status on initial load
   useEffect(() => {
     const checkInitialStatus = async () => {
       // First check if we already have the status from WebSocket
       if (serverStatus && serverStatus.isRunning !== undefined) {
         setLocalIsRunning(serverStatus.isRunning);
+        if (serverStatus.port) {
+          setCurrentPort(serverStatus.port);
+        }
         setIsInitialized(true);
         return;
       }
       
       // If not, check via API
-      const isServerRunning = await getServerStatus();
-      setLocalIsRunning(isServerRunning);
+      try {
+        const response = await fetch('/api/server/status');
+        if (response.ok) {
+          const data = await response.json();
+          setLocalIsRunning(data.isRunning);
+          if (data.port) {
+            setCurrentPort(data.port);
+          }
+          setIsInitialized(true);
+          return data.isRunning;
+        }
+      } catch (error) {
+        console.error('Error checking server status:', error);
+      }
+      
       setIsInitialized(true);
+      return false;
     };
     
     if (!isInitialized) {
@@ -284,7 +309,7 @@ export function ServerControlPanel({ isRunning, port }) {
       
       {displayIsRunning && (
         <div className="server-info">
-          <p>Server is running on port {port}</p>
+          <p>Server is running on port {currentPort}</p>
           <p>Share your IP address with others to receive files</p>
         </div>
       )}

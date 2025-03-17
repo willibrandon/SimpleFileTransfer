@@ -6,7 +6,7 @@ import { ServerView } from './components/server/ServerView'
 import { ClientView } from './components/client/ClientView'
 
 function App() {
-  const [mode, setMode] = useState('client')
+  const [mode, setMode] = useState('server')
   
   // Load the last selected mode from localStorage
   useEffect(() => {
@@ -27,7 +27,7 @@ function App() {
       <header>
         <h1>Simple File Transfer</h1>
         <p>Transfer files with optional compression and encryption</p>
-        <ModeSelector onModeChange={handleModeChange} />
+        <ModeSelector mode={mode} onModeChange={handleModeChange} />
       </header>
 
       <main>
