@@ -10,87 +10,8 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
   // Process transfers prop
   useEffect(() => {
     if (Array.isArray(transfers) && transfers.length > 0) {
-      // First, deduplicate transfers by filename and timestamp
-      // If the same file appears multiple times, prioritize the one that was transferred
-      const deduplicatedTransfers = [];
-      const fileMap = new Map();
-      
-      // First pass: collect all entries by filename
-      transfers.forEach(transfer => {
-        const fileName = transfer.fileName || transfer.FileName || '';
-        if (!fileMap.has(fileName)) {
-          fileMap.set(fileName, []);
-        }
-        fileMap.get(fileName).push(transfer);
-      });
-      
-      // Second pass: for each filename, pick the entry that was most likely transferred
-      fileMap.forEach((entries, fileName) => {
-        // Sort entries by completion status, then by start time (newest first)
-        entries.sort((a, b) => {
-          const aStatus = String(a.status || a.Status || '').toLowerCase();
-          const bStatus = String(b.status || b.Status || '').toLowerCase();
-          
-          // Completed entries come first
-          if (aStatus === 'completed' && bStatus !== 'completed') return -1;
-          if (aStatus !== 'completed' && bStatus === 'completed') return 1;
-          
-          // Then entries with end times
-          const aEndTime = a.endTime || a.EndTime;
-          const bEndTime = b.endTime || b.EndTime;
-          if (aEndTime && !bEndTime) return -1;
-          if (!aEndTime && bEndTime) return 1;
-          
-          // Then sort by start time (newest first)
-          const aStartTime = a.startTime || a.StartTime || '';
-          const bStartTime = b.startTime || b.StartTime || '';
-          return bStartTime.localeCompare(aStartTime);
-        });
-        
-        // Add all entries to the deduplicated list
-        // This ensures we keep both transferred and queued versions
-        entries.forEach(entry => {
-          deduplicatedTransfers.push(entry);
-        });
-      });
-      
-      // Process all transfers and mark them as transferred or queued
-      const processedTransfers = deduplicatedTransfers.map(transfer => {
-        const status = String(transfer.status || transfer.Status || '').toLowerCase();
-        const startTime = transfer.startTime || transfer.StartTime;
-        const endTime = transfer.endTime || transfer.EndTime;
-        
-        // Determine if this was actually transferred or just queued
-        let wasTransferred = false;
-        
-        // Completed transfers
-        if (status === 'completed') {
-          wasTransferred = true;
-        }
-        
-        // Failed transfers (they were attempted)
-        else if (status === 'failed') {
-          wasTransferred = true;
-        }
-        
-        // Transfers with both start and end times
-        else if (startTime && endTime) {
-          wasTransferred = true;
-        }
-        
-        // In-progress transfers or transfers with a start time but no end time
-        else if (status === 'inprogress' || startTime) {
-          wasTransferred = true;
-        }
-        
-        // Return the transfer with the wasTransferred flag
-        return {
-          ...transfer,
-          wasTransferred
-        };
-      });
-      
-      setHistory(processedTransfers);
+      // Process transfers and set history state
+      setHistory(transfers);
     }
   }, [transfers]);
 
@@ -128,92 +49,6 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
     return date.toLocaleString();
   };
 
-  const getStatusClass = (transfer) => {
-    if (!transfer) return '';
-    
-    // If it's just queued, use a specific class
-    if (!transfer.wasTransferred) {
-      return 'queued';
-    }
-    
-    const status = transfer.status || transfer.Status;
-    if (!status) return '';
-    
-    // Convert to string to ensure toLowerCase works
-    const statusStr = String(status);
-    const statusLower = statusStr.toLowerCase();
-    
-    // Handle status values
-    if (statusLower === 'completed') return 'completed-status';
-    if (statusLower === 'failed') return 'failed';
-    if (statusLower === 'inprogress') return 'processing';
-    if (statusLower === 'queued') return 'queued';
-    
-    return '';
-  };
-
-  const getStatusText = (transfer) => {
-    // If it's just queued, show as Queued
-    if (!transfer.wasTransferred) {
-      return 'Queued';
-    }
-    
-    const status = transfer.status || transfer.Status;
-    const startTime = transfer.startTime || transfer.StartTime;
-    const endTime = transfer.endTime || transfer.EndTime;
-    
-    if (!status) {
-      // If it has a start time but no end time and no explicit status, it was likely transferred
-      if (startTime && !endTime) {
-        return 'Completed';
-      }
-      return 'Queued';
-    }
-    
-    // Convert to string to ensure consistent handling
-    const statusStr = String(status);
-    const statusLower = statusStr.toLowerCase();
-    
-    // Handle status values
-    if (statusLower === 'completed') return 'Completed';
-    if (statusLower === 'failed') return 'Failed';
-    if (statusLower === 'inprogress') return 'In Progress';
-    if (statusLower === 'queued') return 'Queued';
-    if (statusLower === 'cancelled') return 'Cancelled';
-    
-    // Return the status with first letter capitalized
-    return statusStr.charAt(0).toUpperCase() + statusStr.slice(1);
-  };
-
-  // Get a tooltip for the status
-  const getStatusTooltip = (transfer) => {
-    if (!transfer.wasTransferred) {
-      return 'File was queued but not yet transferred';
-    }
-    
-    const status = transfer.status || transfer.Status;
-    const startTime = transfer.startTime || transfer.StartTime;
-    const endTime = transfer.endTime || transfer.EndTime;
-    
-    if (!status && startTime && !endTime) {
-      return 'Transfer was completed but end time not recorded';
-    }
-    
-    if (status === '2' || String(status).toLowerCase().includes('complet')) {
-      return 'Transfer completed successfully';
-    }
-    
-    if (status === '3' || String(status).toLowerCase().includes('fail')) {
-      return transfer.error || transfer.Error || 'Transfer failed';
-    }
-    
-    if (status === '1' || String(status).toLowerCase().includes('progress')) {
-      return 'Transfer is in progress';
-    }
-    
-    return 'Unknown status';
-  };
-  
   const handleRetry = async (transfer) => {
     if (!transfer || !transfer.fileName) {
       return;
@@ -241,10 +76,6 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
         setTimeout(() => {
           refreshHistory();
         }, 500); // Small delay to allow the server to process the request
-      } else {
-        setTimeout(() => {
-          handleRefresh();
-        }, 500);
       }
     } catch (error) {
       showStatus(`Failed to retry transfer: ${error.message}`, 'error');
@@ -252,115 +83,9 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
   };
 
   // Manually trigger a history refresh
-  const handleRefresh = async () => {
-    try {
-      if (refreshHistory) {
-        refreshHistory();
-        return;
-      }
-      
-      setLocalError('');
-      const response = await clientApi.getHistory();
-      
-      let transferItems = [];
-      
-      if (response && Array.isArray(response.items)) {
-        transferItems = response.items;
-      } else if (response && Array.isArray(response)) {
-        transferItems = response;
-      } else if (response && response.transfers && Array.isArray(response.transfers)) {
-        transferItems = response.transfers;
-      } else if (response && response.history && Array.isArray(response.history)) {
-        transferItems = response.history;
-      } else {
-        setLocalError('Unexpected response format from server');
-        return;
-      }
-      
-      // First, deduplicate transfers by filename and timestamp
-      // If the same file appears multiple times, prioritize the one that was transferred
-      const deduplicatedTransfers = [];
-      const fileMap = new Map();
-      
-      // First pass: collect all entries by filename
-      transferItems.forEach(transfer => {
-        const fileName = transfer.fileName || transfer.FileName || '';
-        if (!fileMap.has(fileName)) {
-          fileMap.set(fileName, []);
-        }
-        fileMap.get(fileName).push(transfer);
-      });
-      
-      // Second pass: for each filename, pick the entry that was most likely transferred
-      fileMap.forEach((entries, fileName) => {
-        // Sort entries by completion status, then by start time (newest first)
-        entries.sort((a, b) => {
-          const aStatus = String(a.status || a.Status || '').toLowerCase();
-          const bStatus = String(b.status || b.Status || '').toLowerCase();
-          
-          // Completed entries come first
-          if (aStatus === 'completed' && bStatus !== 'completed') return -1;
-          if (aStatus !== 'completed' && bStatus === 'completed') return 1;
-          
-          // Then entries with end times
-          const aEndTime = a.endTime || a.EndTime;
-          const bEndTime = b.endTime || b.EndTime;
-          if (aEndTime && !bEndTime) return -1;
-          if (!aEndTime && bEndTime) return 1;
-          
-          // Then sort by start time (newest first)
-          const aStartTime = a.startTime || a.StartTime || '';
-          const bStartTime = b.startTime || b.StartTime || '';
-          return bStartTime.localeCompare(aStartTime);
-        });
-        
-        // Add all entries to the deduplicated list
-        // This ensures we keep both transferred and queued versions
-        entries.forEach(entry => {
-          deduplicatedTransfers.push(entry);
-        });
-      });
-      
-      // Process all transfers and mark them as transferred or queued
-      const processedTransfers = deduplicatedTransfers.map(transfer => {
-        const status = String(transfer.status || transfer.Status || '').toLowerCase();
-        const startTime = transfer.startTime || transfer.StartTime;
-        const endTime = transfer.endTime || transfer.EndTime;
-        
-        // Determine if this was actually transferred or just queued
-        let wasTransferred = false;
-        
-        // Completed transfers
-        if (status === 'completed') {
-          wasTransferred = true;
-        }
-        
-        // Failed transfers (they were attempted)
-        else if (status === 'failed') {
-          wasTransferred = true;
-        }
-        
-        // Transfers with both start and end times
-        else if (startTime && endTime) {
-          wasTransferred = true;
-        }
-        
-        // In-progress transfers or transfers with a start time but no end time
-        // For resume.docx at 10:08:05 PM, this should mark it as transferred
-        else if (status === 'inprogress' || startTime) {
-          wasTransferred = true;
-        }
-        
-        // Return the transfer with the wasTransferred flag
-        return {
-          ...transfer,
-          wasTransferred
-        };
-      });
-      
-      setHistory(processedTransfers);
-    } catch (err) {
-      setLocalError(`Failed to refresh: ${err.message}`);
+  const handleRefresh = () => {
+    if (refreshHistory) {
+      refreshHistory();
     }
   };
 
@@ -376,39 +101,117 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
 
   return (
     <div className="transfer-history">
-      <h2>
-        Transfer History
+      <div className="history-header">
+        <h2>Transfer History</h2>
         <button 
           onClick={handleRefresh} 
-          style={{ 
-            marginLeft: '10px', 
-            padding: '0.3rem 0.6rem',
-            fontSize: '0.8rem'
-          }}
+          className="refresh-button"
         >
           Refresh
         </button>
-      </h2>
+      </div>
       
       {localError && <div className="error-message">{localError}</div>}
       {statusMessage && <div className={`status ${statusType}`}>{statusMessage}</div>}
       
       <style>
         {`
-          .error-info {
-            margin-left: 8px;
-            cursor: help;
-            font-weight: bold;
+          .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
           }
-          .history-table tr.completed-status {
-            background-color: transparent;
+          
+          .refresh-button {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
           }
-          .history-table tr.queued {
-            opacity: 0.7;
+          
+          .history-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+          }
+          
+          .history-item {
             background-color: var(--bg-highlight);
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
           }
-          .history-table tr.queued td {
-            font-style: italic;
+          
+          .history-item:hover {
+            background-color: var(--light-bg);
+          }
+          
+          .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+          }
+          
+          .file-name {
+            font-weight: bold;
+            font-size: 1rem;
+            color: var(--text-color);
+          }
+          
+          .file-size {
+            color: var(--dim);
+            font-size: 0.9rem;
+          }
+          
+          .history-item-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-color);
+            margin-bottom: 0.75rem;
+          }
+          
+          .detail-label {
+            color: var(--dim);
+          }
+          
+          .status-completed {
+            color: var(--success-color);
+          }
+          
+          .status-failed {
+            color: var(--error-color);
+          }
+          
+          .status-inprogress {
+            color: var(--primary-color);
+          }
+          
+          .history-item-actions {
+            margin-top: 0.75rem;
+            display: flex;
+            justify-content: flex-end;
+          }
+          
+          .retry-button {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+            min-width: 60px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+          }
+          
+          .no-history {
+            text-align: center;
+            padding: 2rem;
+            color: var(--dim);
+            background-color: var(--bg-highlight);
+            border-radius: 4px;
+            margin-top: 1rem;
           }
         `}
       </style>
@@ -419,51 +222,69 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
           {isLoading ? ' (loading...)' : ''}
         </div>
       ) : (
-        <table className="history-table">
-          <thead>
-            <tr>
-              <th>File Name</th>
-              <th>Size</th>
-              <th>Destination</th>
-              <th>Status</th>
-              <th>Started</th>
-              <th>Completed</th>
-              <th>Options</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((transfer) => (
-              <tr key={transfer.id || transfer.Id} className={getStatusClass(transfer)}>
-                <td>{transfer.fileName || transfer.FileName}</td>
-                <td>{formatFileSize(transfer.size || transfer.Size)}</td>
-                <td>{(transfer.host || transfer.Host || transfer.targetHost || transfer.TargetHost || 'Unknown')}:{transfer.port || transfer.Port || 0}</td>
-                <td title={getStatusTooltip(transfer)}>{getStatusText(transfer)}</td>
-                <td>{formatDate(transfer.startTime || transfer.StartTime)}</td>
-                <td>{formatDate(transfer.endTime || transfer.EndTime)}</td>
-                <td>
-                  {(String(transfer.status || transfer.Status).toLowerCase() === 'failed' || 
-                    (!transfer.wasTransferred && !(transfer.startTime || transfer.StartTime))) && (
+        <ul className="history-list">
+          {history.map((transfer) => {
+            const fileName = transfer.fileName || transfer.FileName;
+            const size = formatFileSize(transfer.size || transfer.Size);
+            const destination = `${(transfer.host || transfer.Host || transfer.targetHost || transfer.TargetHost || 'Unknown')}:${transfer.port || transfer.Port || 0}`;
+            const status = transfer.status || transfer.Status || '';
+            const statusLower = String(status).toLowerCase();
+            const startTime = formatDate(transfer.startTime || transfer.StartTime);
+            const endTime = formatDate(transfer.endTime || transfer.EndTime);
+            
+            let statusClass = '';
+            if (statusLower.includes('complet')) statusClass = 'status-completed';
+            else if (statusLower.includes('fail')) statusClass = 'status-failed';
+            else if (statusLower.includes('progress')) statusClass = 'status-inprogress';
+            
+            return (
+              <li key={transfer.id || transfer.Id} className="history-item">
+                <div className="history-item-header">
+                  <span className="file-name">{fileName}</span>
+                  <span className="file-size">{size}</span>
+                </div>
+                
+                <div className="history-item-details">
+                  <div>
+                    <span className="detail-label">Destination: </span>
+                    {destination}
+                  </div>
+                  
+                  <div>
+                    <span className="detail-label">Status: </span>
+                    <span className={statusClass}>
+                      {statusLower.includes('complet') ? 'Completed' : 
+                       statusLower.includes('fail') ? 'Failed' :
+                       statusLower.includes('progress') ? 'In Progress' : 
+                       status || 'Unknown'}
+                    </span>
+                  </div>
+                  
+                  <div>
+                    <span className="detail-label">Started: </span>
+                    {startTime}
+                  </div>
+                  
+                  <div>
+                    <span className="detail-label">Completed: </span>
+                    {endTime}
+                  </div>
+                </div>
+                
+                {statusLower.includes('fail') && (
+                  <div className="history-item-actions">
                     <button 
                       className="retry-button"
                       onClick={() => handleRetry(transfer)}
                     >
-                      {transfer.wasTransferred ? 'Retry' : 'Transfer'}
+                      Retry
                     </button>
-                  )}
-                  {(String(transfer.status || transfer.Status).toLowerCase() === 'failed') && 
-                    (transfer.error || transfer.Error) && (
-                    <span 
-                      className="error-info" 
-                      title={transfer.error || transfer.Error}
-                    >
-                      ⓘ
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

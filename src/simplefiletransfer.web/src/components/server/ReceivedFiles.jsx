@@ -187,49 +187,134 @@ export function ReceivedFiles({ files = [], isLoading = false }) {
     <div className="received-files">
       <h2>Received Files</h2>
       
+      <style>
+        {`
+          .files-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+          }
+          
+          .file-item {
+            background-color: var(--bg-highlight);
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+          }
+          
+          .file-item:hover {
+            background-color: var(--light-bg);
+          }
+          
+          .file-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+          }
+          
+          .file-name {
+            font-weight: bold;
+            font-size: 1rem;
+            color: var(--text-color);
+          }
+          
+          .file-size {
+            color: var(--dim);
+            font-size: 0.9rem;
+          }
+          
+          .file-item-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-color);
+            margin-bottom: 0.75rem;
+          }
+          
+          .detail-label {
+            color: var(--dim);
+          }
+          
+          .file-item-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+          }
+          
+          .open-button, .open-folder-button {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+            min-width: 60px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            color: white;
+          }
+          
+          .open-button {
+            background-color: var(--primary-color);
+          }
+          
+          .open-folder-button {
+            background-color: var(--dim);
+          }
+          
+          .no-files {
+            text-align: center;
+            padding: 2rem;
+            color: var(--dim);
+            background-color: var(--bg-highlight);
+            border-radius: 4px;
+            margin-top: 1rem;
+          }
+        `}
+      </style>
+      
       {!validFiles || validFiles.length === 0 ? (
         <div className="no-files">No files received yet</div>
       ) : (
-        <table className="files-table">
-          <thead>
-            <tr>
-              <th>File Name</th>
-              <th>Size</th>
-              <th>Sender</th>
-              <th>Received</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {validFiles.map((file) => (
-              <tr key={file.id}>
-                <td>{file.fileName}</td>
-                <td>{formatFileSize(file.size)}</td>
-                <td>{file.sender || 'Unknown'}</td>
-                <td>{formatDate(file.receivedDate)}</td>
-                <td>
-                  <div className="action-buttons">
-                    <button 
-                      className={getButtonClass(file.id)}
-                      style={getButtonStyle(file.id)}
-                      onClick={() => openFile(file.id)}
-                      disabled={downloadStatus[file.id] === 'loading'}
-                    >
-                      {getButtonText(file.id)}
-                    </button>
-                    <button 
-                      className="open-folder-button"
-                      onClick={() => openFolder(file.directory)}
-                      disabled={!file.directory}
-                    >
-                      Folder
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ul className="files-list">
+          {validFiles.map((file) => (
+            <li key={file.id} className="file-item">
+              <div className="file-item-header">
+                <span className="file-name">{file.fileName}</span>
+                <span className="file-size">{formatFileSize(file.size)}</span>
+              </div>
+              
+              <div className="file-item-details">
+                <div>
+                  <span className="detail-label">Sender: </span>
+                  {file.sender || 'Unknown'}
+                </div>
+                
+                <div>
+                  <span className="detail-label">Received: </span>
+                  {formatDate(file.receivedDate)}
+                </div>
+              </div>
+              
+              <div className="file-item-actions">
+                <button 
+                  className={getButtonClass(file.id)}
+                  style={getButtonStyle(file.id)}
+                  onClick={() => openFile(file.id)}
+                  disabled={downloadStatus[file.id] === 'loading'}
+                >
+                  {getButtonText(file.id)}
+                </button>
+                <button 
+                  className="open-folder-button"
+                  onClick={() => openFolder(file.directory)}
+                  disabled={!file.directory}
+                >
+                  Folder
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
