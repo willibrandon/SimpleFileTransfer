@@ -179,8 +179,11 @@ export function ServerControlPanel({ isRunning, port }) {
         throw new Error(errorData.error || 'Failed to stop server')
       }
       
-      // Update local state
-      setLocalIsRunning(false);
+      // Parse the response
+      const data = await response.json();
+      
+      // Update local state based on the response
+      setLocalIsRunning(data.isRunning === true);
     } catch (error) {
       // Show error message without console logging
       setStatusMessage({ 

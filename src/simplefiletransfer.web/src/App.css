@@ -225,46 +225,8 @@ button:disabled {
   position: relative; /* Added for absolute positioning of status message */
 }
 
-/* Status message container with fixed height */
-.status-message-container {
-  display: none;
-}
-
-/* Status message styling */
-.status-message {
-  padding: 10px;
-  border-radius: 4px;
-  text-align: center;
-  width: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-.status-message.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.status-message.error {
-  background-color: rgba(231, 76, 60, 0.1);
-  color: #e74c3c;
-  border: 1px solid rgba(231, 76, 60, 0.3);
-}
-
-.status-message.success {
-  background-color: rgba(46, 204, 113, 0.1);
-  color: #2ecc71;
-  border: 1px solid rgba(46, 204, 113, 0.3);
-}
-
-.status-message.info {
-  background-color: rgba(52, 152, 219, 0.1);
-  color: #3498db;
-  border: 1px solid rgba(52, 152, 219, 0.3);
+.server-control-panel {
+  padding-top: 0.75rem; /* Reduced top padding */
 }
 
 .server-control-panel h2,
@@ -275,6 +237,10 @@ button:disabled {
   color: var(--primary-color);
   margin-bottom: 1.5rem;
   font-size: 1.5rem;
+}
+
+.server-control-panel h2 {
+  margin-top: 0; /* Remove top margin */
 }
 
 .server-control-panel h3,
@@ -599,4 +565,46 @@ footer {
 .toast-message.info {
   background-color: var(--primary-color);
   color: white;
+}
+
+/* Status message container with fixed height */
+.status-message-container {
+  display: none;
+}
+
+/* Status message styling */
+.status-message {
+  padding: 10px;
+  border-radius: 4px;
+  text-align: center;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.status-message.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.status-message.error {
+  background-color: rgba(231, 76, 60, 0.1);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.status-message.success {
+  background-color: rgba(46, 204, 113, 0.1);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.status-message.info {
+  background-color: rgba(52, 152, 219, 0.1);
+  color: #3498db;
+  border: 1px solid rgba(52, 152, 219, 0.3);
 }

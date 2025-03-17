@@ -177,7 +177,8 @@ public class ServerController : ControllerBase
     {
         if (_server == null || _serverCts == null || _serverCts.IsCancellationRequested)
         {
-            return BadRequest(new { error = "Server is not running" });
+            // Return Ok instead of BadRequest when server is not running
+            return Ok(new { isRunning = false, message = "Server is not running" });
         }
 
         try
