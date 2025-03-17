@@ -35,13 +35,42 @@ export function ServerControlPanel({ isRunning, port }) {
   })
   const [statusMessage, setStatusMessage] = useState({ type: '', message: '' })
   const [localIsRunning, setLocalIsRunning] = useState(isRunning)
+  const [isInitialized, setIsInitialized] = useState(false)
   
-  const { connected } = useWebSocket()
+  const { connected, serverStatus } = useWebSocket()
   
   // Update local state when props change
   useEffect(() => {
     setLocalIsRunning(isRunning);
   }, [isRunning]);
+  
+  // Check server status on initial load
+  useEffect(() => {
+    const checkInitialStatus = async () => {
+      // First check if we already have the status from WebSocket
+      if (serverStatus && serverStatus.isRunning !== undefined) {
+        setLocalIsRunning(serverStatus.isRunning);
+        setIsInitialized(true);
+        return;
+      }
+      
+      // If not, check via API
+      const isServerRunning = await getServerStatus();
+      setLocalIsRunning(isServerRunning);
+      setIsInitialized(true);
+    };
+    
+    if (!isInitialized) {
+      checkInitialStatus();
+    }
+  }, [serverStatus, isInitialized]);
+  
+  // Update from WebSocket server status
+  useEffect(() => {
+    if (serverStatus && serverStatus.isRunning !== undefined && isInitialized) {
+      setLocalIsRunning(serverStatus.isRunning);
+    }
+  }, [serverStatus, isInitialized]);
   
   // Check server status before starting
   const getServerStatus = async () => {

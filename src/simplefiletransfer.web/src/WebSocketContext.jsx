@@ -21,6 +21,26 @@ export function WebSocketProvider({ children }) {
   const maxReconnectAttempts = useRef(10);
   const reconnectTimeoutId = useRef(null);
   const isUnmounting = useRef(false);
+  const hasCheckedServerStatus = useRef(false);
+
+  // Check server status via API
+  const checkServerStatus = async () => {
+    try {
+      const response = await fetch('/api/server/status');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Server status from API:', data);
+        setServerStatus({ 
+          isRunning: data.isRunning, 
+          port: data.port || 0 
+        });
+        return data.isRunning;
+      }
+    } catch (error) {
+      console.error('Error checking server status:', error);
+    }
+    return false;
+  };
 
   // Function to create a new WebSocket connection
   const createWebSocketConnection = () => {
@@ -45,6 +65,12 @@ export function WebSocketProvider({ children }) {
       reconnectAttempts.current = 0;
       setConnected(true);
       console.log('WebSocket connected');
+      
+      // Check server status if we haven't already
+      if (!hasCheckedServerStatus.current) {
+        checkServerStatus();
+        hasCheckedServerStatus.current = true;
+      }
       
       // Request initial data
       setTimeout(() => {
@@ -101,6 +127,15 @@ export function WebSocketProvider({ children }) {
   // Connect to the WebSocket server
   useEffect(() => {
     isUnmounting.current = false;
+    
+    // Check server status immediately on mount
+    const initialStatusCheck = async () => {
+      await checkServerStatus();
+      hasCheckedServerStatus.current = true;
+    };
+    initialStatusCheck();
+    
+    // Create WebSocket connection
     createWebSocketConnection();
     
     // Clean up on unmount
@@ -165,14 +200,21 @@ export function WebSocketProvider({ children }) {
   const handleEvent = (event) => {
     switch (event.type) {
       case 'server_status':
-        setServerStatus(event.data);
+        console.log('Received server_status event:', event.data);
+        // Handle different property name formats (camelCase vs PascalCase)
+        const isRunning = event.data.isRunning !== undefined ? event.data.isRunning : 
+                          event.data.IsRunning !== undefined ? event.data.IsRunning : false;
+        const port = event.data.port || event.data.Port || 0;
+        setServerStatus({ isRunning, port });
         break;
         
       case 'server_started':
-        setServerStatus({ isRunning: true, port: event.data.port });
+        console.log('Received server_started event:', event.data);
+        setServerStatus({ isRunning: true, port: event.data.port || event.data.Port || 0 });
         break;
         
       case 'server_stopped':
+        console.log('Received server_stopped event:', event.data);
         setServerStatus({ isRunning: false, port: 0 });
         break;
         
