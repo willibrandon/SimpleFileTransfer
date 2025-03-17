@@ -4,7 +4,7 @@ using SimpleFileTransfer.Transfer;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace SimpleFileTransfer.Tests;
+namespace SimpleFileTransfer.Tests.Transfer;
 
 public class FileTransferTests : IDisposable
 {

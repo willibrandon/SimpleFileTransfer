@@ -2,7 +2,7 @@ using SimpleFileTransfer.Helpers;
 using SimpleFileTransfer.Queue;
 using SimpleFileTransfer.Transfer;
 
-namespace SimpleFileTransfer.Tests;
+namespace SimpleFileTransfer.Tests.Queue;
 
 public class TransferQueueTests : IDisposable
 {

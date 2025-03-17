@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using Xunit;
 
-namespace SimpleFileTransfer.Tests;
+namespace SimpleFileTransfer.Tests.Helpers;
 
 public class CompressionTests
 {
