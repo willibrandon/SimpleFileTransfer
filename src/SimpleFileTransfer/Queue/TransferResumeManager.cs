@@ -1,10 +1,11 @@
+using SimpleFileTransfer.Helpers;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
 
-namespace SimpleFileTransfer;
+namespace SimpleFileTransfer.Queue;
 
 /// <summary>
 /// Manages the state of file transfers that can be resumed.

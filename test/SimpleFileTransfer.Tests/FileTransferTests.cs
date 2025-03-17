@@ -1,3 +1,6 @@
+using SimpleFileTransfer.Helpers;
+using SimpleFileTransfer.Queue;
+using SimpleFileTransfer.Transfer;
 using System.Security.Cryptography;
 using System.Text;
 

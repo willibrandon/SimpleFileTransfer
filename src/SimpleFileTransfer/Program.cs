@@ -6,7 +6,10 @@ using System.Threading;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using SimpleFileTransfer.Helpers;
+using SimpleFileTransfer.Queue;
 using SimpleFileTransfer.Services;
+using SimpleFileTransfer.Transfer;
 
 namespace SimpleFileTransfer;
 

@@ -1,7 +1,7 @@
 using System.IO;
 using System.IO.Compression;
 
-namespace SimpleFileTransfer;
+namespace SimpleFileTransfer.Helpers;
 
 /// <summary>
 /// Provides utility methods for compressing and decompressing data using different compression algorithms.
@@ -89,6 +89,6 @@ public static class CompressionHelper
         if (originalSize == 0)
             return 0;
             
-        return 100.0 - ((double)compressedSize / originalSize * 100.0);
+        return 100.0 - (double)compressedSize / originalSize * 100.0;
     }
 }

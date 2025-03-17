@@ -3,7 +3,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace SimpleFileTransfer;
+namespace SimpleFileTransfer.Helpers;
 
 /// <summary>
 /// Provides encryption and decryption functionality for file transfers.

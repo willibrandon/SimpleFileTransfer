@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 
-namespace SimpleFileTransfer;
+namespace SimpleFileTransfer.Helpers;
 
 /// <summary>
 /// Provides utility methods for file operations in the SimpleFileTransfer application.

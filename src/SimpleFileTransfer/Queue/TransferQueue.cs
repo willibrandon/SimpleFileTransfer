@@ -1,10 +1,12 @@
+using SimpleFileTransfer.Helpers;
+using SimpleFileTransfer.Transfer;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SimpleFileTransfer;
+namespace SimpleFileTransfer.Queue;
 
 /// <summary>
 /// Manages a queue of file transfers to be executed sequentially.

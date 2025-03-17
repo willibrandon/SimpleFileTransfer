@@ -1,3 +1,5 @@
+using SimpleFileTransfer.Helpers;
+using SimpleFileTransfer.Queue;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -5,7 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 
-namespace SimpleFileTransfer;
+namespace SimpleFileTransfer.Transfer;
 
 /// <summary>
 /// Handles client-side file transfer operations, including sending files and directories.
