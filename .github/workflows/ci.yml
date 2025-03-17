@@ -45,7 +45,8 @@ jobs:
     - name: Test with coverage (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        gtimeout 10m dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage || (echo "Tests timed out after 10 minutes" && exit 1)
+        # macOS doesn't have gtimeout by default, use a pure bash solution
+        (dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage & PID=$!; (sleep 600 && kill $PID 2>/dev/null && echo "Tests timed out after 10 minutes" && exit 1) & WATCHDOG=$!; wait $PID && kill $WATCHDOG 2>/dev/null)
     
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
