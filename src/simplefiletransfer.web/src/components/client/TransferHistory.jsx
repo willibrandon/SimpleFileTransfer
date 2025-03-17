@@ -206,6 +206,10 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
             color: var(--dim);
           }
           
+          .detail-value {
+            white-space: nowrap;
+          }
+          
           .status-completed {
             color: var(--success-color);
           }
@@ -302,14 +306,14 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
                       </span>
                     </div>
                     
-                    <div>
+                    <div style={{ whiteSpace: 'nowrap' }}>
                       <span className="detail-label">Started: </span>
-                      {startTime}
+                      <span className="detail-value">{startTime}</span>
                     </div>
                     
-                    <div>
+                    <div style={{ whiteSpace: 'nowrap' }}>
                       <span className="detail-label">Completed: </span>
-                      {endTime}
+                      <span className="detail-value">{endTime}</span>
                     </div>
                   </div>
                   

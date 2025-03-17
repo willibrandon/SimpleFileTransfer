@@ -176,6 +176,36 @@ export function FileTransferForm({ onTransferComplete }) {
           />
         </div>
         
+        <style>
+          {`
+            .options {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 1rem;
+              margin-bottom: 1.5rem;
+            }
+            
+            .checkbox-group {
+              display: flex;
+              align-items: center;
+              min-width: 150px;
+            }
+            
+            .checkbox-group input[type="checkbox"] {
+              margin-right: 0.5rem;
+              width: 18px;
+              height: 18px;
+              position: relative;
+              top: 0;
+            }
+            
+            .checkbox-group label {
+              margin-bottom: 0;
+              white-space: nowrap;
+            }
+          `}
+        </style>
+        
         <div className="options">
           <div className="checkbox-group">
             <input
