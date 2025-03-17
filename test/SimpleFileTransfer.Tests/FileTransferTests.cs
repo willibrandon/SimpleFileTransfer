@@ -456,7 +456,7 @@ public class FileTransferTests : IDisposable
         var testFilePath = Path.Combine(_testDir, "resume_test.dat");
         File.WriteAllText(testFilePath, "Test content");
         
-        var resumeInfo = new TransferResumeManager.ResumeInfo
+        var resumeInfo = new ResumeInfo
         {
             FilePath = testFilePath,
             FileName = Path.GetFileName(testFilePath),

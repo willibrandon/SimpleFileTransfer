@@ -79,7 +79,7 @@ public class FileTransferClient
         Console.WriteLine("done");
         
         // Check for resume information
-        TransferResumeManager.ResumeInfo? resumeInfo = null;
+        ResumeInfo? resumeInfo = null;
         long resumePosition = 0;
         
         if (_resumeEnabled)
@@ -109,7 +109,7 @@ public class FileTransferClient
         // If no valid resume info, create a new one
         if (_resumeEnabled && resumeInfo == null)
         {
-            resumeInfo = new TransferResumeManager.ResumeInfo
+            resumeInfo = new ResumeInfo
             {
                 FilePath = filepath,
                 FileName = Path.GetFileName(filepath),
@@ -436,7 +436,7 @@ public class FileTransferClient
                 var hash = FileOperations.CalculateHash(file);
                 
                 // Check for resume information
-                TransferResumeManager.ResumeInfo? resumeInfo = null;
+                ResumeInfo? resumeInfo = null;
                 long resumePosition = 0;
                 
                 if (_resumeEnabled)
@@ -468,7 +468,7 @@ public class FileTransferClient
                 // If no valid resume info, create a new one
                 if (_resumeEnabled && resumeInfo == null)
                 {
-                    resumeInfo = new TransferResumeManager.ResumeInfo
+                    resumeInfo = new ResumeInfo
                     {
                         FilePath = file,
                         FileName = Path.GetFileName(file),
@@ -914,7 +914,7 @@ public class FileTransferClient
                 Console.WriteLine("done");
                 
                 // Check for resume information
-                TransferResumeManager.ResumeInfo? resumeInfo = null;
+                ResumeInfo? resumeInfo = null;
                 long resumePosition = 0;
                 
                 if (_resumeEnabled)
@@ -944,7 +944,7 @@ public class FileTransferClient
                 // If no valid resume info, create a new one
                 if (_resumeEnabled && resumeInfo == null)
                 {
-                    resumeInfo = new TransferResumeManager.ResumeInfo
+                    resumeInfo = new ResumeInfo
                     {
                         FilePath = filePath,
                         FileName = Path.GetFileName(filePath),
