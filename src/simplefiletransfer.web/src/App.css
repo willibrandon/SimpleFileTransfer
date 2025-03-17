@@ -29,13 +29,13 @@ body {
 [data-theme="dark"] .send-file h2,
 [data-theme="dark"] .client-mode h2,
 [data-theme="dark"] .queue-manager h2 {
-  color: #777777; /* Dark gray for headings in dark mode - no blue */
+  color: #aaaaaa; /* Updated to lighter gray for better readability */
 }
 
 /* Target all headings in dark mode */
 [data-theme="dark"] h1,
 [data-theme="dark"] h2 {
-  color: #777777 !important; /* Dark gray for all headings - no blue */
+  color: #aaaaaa !important; /* Updated to lighter gray for better readability */
 }
 
 /* Dark mode checkbox styles */
@@ -47,18 +47,18 @@ body {
 
 /* Dark mode file input styles */
 [data-theme="dark"] input[type="file"] {
-  color: #777777;
+  color: #aaaaaa;
 }
 
 [data-theme="dark"] input[type="file"]::-webkit-file-upload-button {
   background-color: #111111;
-  color: #777777;
+  color: #aaaaaa;
   border: 1px solid #333333;
 }
 
 [data-theme="dark"] input[type="file"]::file-selector-button {
   background-color: #111111;
-  color: #777777;
+  color: #aaaaaa;
   border: 1px solid #333333;
 }
 
@@ -73,7 +73,7 @@ body {
 
 [data-theme="dark"] button:disabled {
   background-color: #111111; /* Pure darkness */
-  color: #333333; /* Very dark gray text */
+  color: #555555; /* Increased contrast for disabled buttons */
   cursor: not-allowed;
   border: 1px solid #222222;
 }
@@ -88,24 +88,24 @@ body {
 /* Dark mode specific styles for action buttons */
 [data-theme="dark"] .start-button {
   background-color: #111111; /* Pure darkness */
-  color: #555555; /* Dark gray text */
+  color: #aaaaaa; /* Lighter gray text for better readability */
   border: 1px solid #222222;
 }
 
 [data-theme="dark"] .start-button:hover {
   background-color: #181818; /* Slightly lighter on hover */
-  color: #666666;
+  color: #cccccc; /* Even lighter on hover */
 }
 
 [data-theme="dark"] .stop-button {
   background-color: #111111; /* Pure darkness */
-  color: #555555; /* Dark gray text */
+  color: #aaaaaa; /* Lighter gray text for better readability */
   border: 1px solid #222222;
 }
 
 [data-theme="dark"] .stop-button:hover {
   background-color: #181818; /* Slightly lighter on hover */
-  color: #666666;
+  color: #cccccc; /* Even lighter on hover */
 }
 
 [data-theme="dark"] .clear-button {
@@ -133,24 +133,24 @@ body {
 
 [data-theme="dark"] .control-button.start {
   background-color: #111111; /* Pure darkness */
-  color: #555555; /* Dark gray text */
+  color: #aaaaaa; /* Lighter gray text for better readability */
   border: 1px solid #222222;
 }
 
 [data-theme="dark"] .control-button.start:hover {
   background-color: #181818; /* Slightly lighter on hover */
-  color: #666666;
+  color: #cccccc; /* Even lighter on hover */
 }
 
 [data-theme="dark"] .control-button.stop {
   background-color: #111111; /* Pure darkness */
-  color: #555555; /* Dark gray text */
+  color: #aaaaaa; /* Lighter gray text for better readability */
   border: 1px solid #222222;
 }
 
 [data-theme="dark"] .control-button.stop:hover {
   background-color: #181818; /* Slightly lighter on hover */
-  color: #666666;
+  color: #cccccc; /* Even lighter on hover */
 }
 
 [data-theme="dark"] .save-button {
@@ -189,7 +189,7 @@ body {
 
 /* Dark mode status colors */
 [data-theme="dark"] .status-completed {
-  color: #4caf50; /* Darker green for completed status */
+  color: #8fbcbb; /* Light blue-gray for completed status - distinct but not green */
 }
 
 [data-theme="dark"] .status-failed {
@@ -197,7 +197,7 @@ body {
 }
 
 [data-theme="dark"] .status-inprogress {
-  color: #555555; /* Dark gray for in-progress status */
+  color: #aaaaaa; /* Updated to lighter gray for better readability */
 }
 
 .app-container {
@@ -857,17 +857,17 @@ footer {
 /* Dark mode theme indicator */
 [data-theme="dark"] #theme-indicator {
   background-color: #111111;
-  color: #555555;
+  color: #aaaaaa;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
 }
 
 [data-theme="dark"] #theme-indicator:hover {
-  color: #777777;
+  color: #cccccc;
 }
 
 /* Make Transfer Now button darker in dark mode */
 [data-theme="dark"] .transfer-button {
   background-color: #111111; /* Almost black */
-  color: #777777; /* Dark gray text */
+  color: #aaaaaa; /* Updated to lighter gray text */
   border: 1px solid #333333; /* Dark border */
 }

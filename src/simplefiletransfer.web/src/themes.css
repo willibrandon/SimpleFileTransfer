@@ -29,11 +29,11 @@
     /* Dark theme (extremely dark) */
     --bg-dark: #000000;
     --bg-highlight-dark: #0a0a0a;
-    --text-dark: #777777;
-    --dim-dark: #444444;
+    --text-dark: #aaaaaa;
+    --dim-dark: #666666;
     --success-dark: #2e7d32;
     --error-dark: #c62828;
-    --info-dark: #555555;
+    --info-dark: #7a7a7a;
     --warning-dark: #ef6c00;
     --purple-dark: #6a1b9a;
     --cyan-dark: #00838f;
