@@ -73,19 +73,19 @@ public class ServerController : ControllerBase
             _config = config;
         }
         
+        // Ensure downloads directory is not empty
+        if (string.IsNullOrWhiteSpace(_config.DownloadsDirectory))
+        {
+            _config.DownloadsDirectory = Program.DownloadsDirectory;
+        }
+        
+        Console.WriteLine($"Starting server with downloads directory: {_config.DownloadsDirectory}");
+        
         // Create a new cancellation token source
         _serverCts = new CancellationTokenSource();
         
         try
         {
-            // Ensure downloads directory is not empty
-            if (string.IsNullOrWhiteSpace(_config.DownloadsDirectory))
-            {
-                _config.DownloadsDirectory = Program.DownloadsDirectory;
-            }
-            
-            Console.WriteLine($"Starting server with downloads directory: {_config.DownloadsDirectory}");
-            
             // Create the downloads directory if it doesn't exist
             if (!Directory.Exists(_config.DownloadsDirectory))
             {
@@ -100,6 +100,9 @@ public class ServerController : ControllerBase
                     throw new Exception($"Could not create downloads directory: {dirEx.Message}", dirEx);
                 }
             }
+            
+            // Scan the downloads directory for existing files
+            ScanDownloadsDirectory();
             
             // Create and start the server
             try
@@ -134,7 +137,7 @@ public class ServerController : ControllerBase
                 await WebSocketServer.BroadcastEventAsync(new WebSocketEvent
                 {
                     Type = "received_files",
-                    Data = _receivedFiles.Where(f => !string.IsNullOrEmpty(f.FileName) && f.Size > 0).ToList()
+                    Data = GetReceivedFiles()
                 });
                 
                 return Ok(new { isRunning = true, port = _config.Port });
@@ -318,6 +321,68 @@ public class ServerController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { error = $"Failed to open folder: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Scans the downloads directory for existing files and adds them to the received files list.
+    /// </summary>
+    private void ScanDownloadsDirectory()
+    {
+        try
+        {
+            // Clear existing files list to avoid duplicates
+            _receivedFiles.Clear();
+            
+            if (!Directory.Exists(_config.DownloadsDirectory))
+            {
+                Console.WriteLine($"Downloads directory does not exist: {_config.DownloadsDirectory}");
+                return;
+            }
+            
+            Console.WriteLine($"Scanning downloads directory: {_config.DownloadsDirectory}");
+            
+            // Get all files in the downloads directory
+            var files = Directory.GetFiles(_config.DownloadsDirectory, "*", SearchOption.AllDirectories);
+            Console.WriteLine($"Found {files.Length} files in downloads directory");
+            
+            foreach (var filePath in files)
+            {
+                try
+                {
+                    var fileInfo = new FileInfo(filePath);
+                    if (!fileInfo.Exists || fileInfo.Length == 0)
+                    {
+                        Console.WriteLine($"Skipping file {filePath}: File does not exist or is empty");
+                        continue;
+                    }
+                    
+                    // Add the file to the received files list
+                    var receivedFile = new ReceivedFileInfo
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        FileName = Path.GetFileName(filePath),
+                        FilePath = filePath,
+                        Directory = Path.GetDirectoryName(filePath) ?? string.Empty,
+                        Size = fileInfo.Length,
+                        ReceivedDate = fileInfo.CreationTime,
+                        Sender = "Unknown (Existing File)"
+                    };
+                    
+                    _receivedFiles.Add(receivedFile);
+                    Console.WriteLine($"Added existing file to list: {receivedFile.FileName}, Size: {receivedFile.Size} bytes");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error processing existing file {filePath}: {ex.Message}");
+                }
+            }
+            
+            Console.WriteLine($"Added {_receivedFiles.Count} existing files to the received files list");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error scanning downloads directory: {ex.Message}");
         }
     }
 

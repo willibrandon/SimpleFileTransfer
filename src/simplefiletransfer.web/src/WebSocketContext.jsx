@@ -120,19 +120,44 @@ export function WebSocketProvider({ children }) {
   
   // Process file data to ensure it's valid
   const processFileData = (file) => {
-    if (!file) return null;
+    if (!file) {
+      console.log('processFileData received null file');
+      return null;
+    }
+    
+    console.log('Raw file data:', file);
+    
+    // Handle different property name formats (camelCase vs PascalCase)
+    const rawFileName = file.fileName || file.FileName || '';
+    const rawFilePath = file.filePath || file.FilePath || '';
+    const rawDirectory = file.directory || file.Directory || '';
+    const rawSize = file.size || file.Size || 0;
+    const rawSender = file.sender || file.Sender || 'Unknown';
+    const rawReceivedDate = file.receivedDate || file.ReceivedDate || new Date().toISOString();
     
     // Generate an ID if one doesn't exist
-    const id = file.id || `file-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const id = file.id || file.Id || `file-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Extract directory from file path if not provided
+    let directory = rawDirectory;
+    if (!directory && rawFilePath) {
+      const lastSlashIndex = Math.max(
+        rawFilePath.lastIndexOf('\\'),
+        rawFilePath.lastIndexOf('/')
+      );
+      if (lastSlashIndex > 0) {
+        directory = rawFilePath.substring(0, lastSlashIndex);
+      }
+    }
     
     return {
       id: id,
-      fileName: file.fileName || 'Unknown',
-      filePath: file.filePath || '',
-      directory: file.directory || (file.filePath ? file.filePath.substring(0, file.filePath.lastIndexOf('\\')) : ''),
-      size: typeof file.size === 'number' ? file.size : 0,
-      sender: file.sender || 'Unknown',
-      receivedDate: file.receivedDate || new Date().toISOString()
+      fileName: rawFileName,
+      filePath: rawFilePath,
+      directory: directory,
+      size: typeof rawSize === 'number' ? rawSize : parseInt(rawSize, 10) || 0,
+      sender: rawSender,
+      receivedDate: rawReceivedDate
     };
   };
   
@@ -153,17 +178,40 @@ export function WebSocketProvider({ children }) {
         
       case 'received_files':
         // Handle initial list of received files
+        console.log('Received files event with data:', event.data);
+        
         if (Array.isArray(event.data)) {
           // Filter out invalid files and process the data
           const validFiles = event.data
-            .filter(file => file && file.fileName && file.size > 0)
-            .map(processFileData)
-            .filter(Boolean);
+            .map(file => {
+              console.log('Processing file:', file);
+              // Process the file data first to ensure all fields are populated
+              const processed = processFileData(file);
+              console.log('Processed file data:', processed);
+              return processed;
+            })
+            .filter(file => {
+              if (!file) {
+                console.log('Filtering out null file');
+                return false;
+              }
+              if (!file.fileName) {
+                console.log('Filtering out file with no fileName:', file);
+                return false;
+              }
+              if (file.size <= 0) {
+                console.log('Filtering out file with invalid size:', file);
+                return false;
+              }
+              return true;
+            });
             
-            console.log('Received files list:', validFiles);
-            if (validFiles.length > 0) {
-              setReceivedFiles(validFiles);
-            }
+          console.log('Received files list after processing:', validFiles);
+          
+          // Always update the state with the received files, even if empty
+          setReceivedFiles(validFiles);
+        } else {
+          console.warn('Received files event with non-array data:', event.data);
         }
         break;
         

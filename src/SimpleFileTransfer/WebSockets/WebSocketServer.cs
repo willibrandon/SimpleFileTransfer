@@ -288,25 +288,33 @@ public class WebSocketServer
     /// <returns>A task representing the asynchronous operation</returns>
     private static async Task SendInitialStateAsync(WebSocket socket)
     {
-        // Send server status
-        await SendEventAsync(socket, new WebSocketEvent
+        try
         {
-            Type = "server_status",
-            Data = new
+            // Send server status
+            await SendEventAsync(socket, new WebSocketEvent
             {
-                IsRunning = FileTransferServer.IsRunning,
-                Port = FileTransferServer.CurrentPort
-            }
-        });
-        
-        // Get the received files from the ServerController
-        var receivedFiles = ServerController.GetReceivedFiles();
-        
-        // Send received files list
-        await SendEventAsync(socket, new WebSocketEvent
+                Type = "server_status",
+                Data = new
+                {
+                    IsRunning = FileTransferServer.IsRunning,
+                    Port = FileTransferServer.CurrentPort
+                }
+            });
+            
+            // Get the received files from the ServerController
+            var receivedFiles = ServerController.GetReceivedFiles();
+            Console.WriteLine($"Sending {receivedFiles.Count} received files to new WebSocket client");
+            
+            // Send received files list
+            await SendEventAsync(socket, new WebSocketEvent
+            {
+                Type = "received_files",
+                Data = receivedFiles
+            });
+        }
+        catch (Exception ex)
         {
-            Type = "received_files",
-            Data = receivedFiles
-        });
+            Console.WriteLine($"Error sending initial state to WebSocket client: {ex.Message}");
+        }
     }
 } 
