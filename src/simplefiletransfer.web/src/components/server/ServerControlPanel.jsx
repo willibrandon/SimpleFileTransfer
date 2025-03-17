@@ -283,28 +283,30 @@ export function ServerControlPanel({ isRunning, port }) {
       )}
       
       <div className="server-status">
-        <div>
+        <div className="status-container">
           <span>Status: </span>
           <span className={`status-indicator ${displayIsRunning ? 'active' : 'inactive'}`}>
             {displayIsRunning ? 'Running' : 'Stopped'}
           </span>
         </div>
         
-        {displayIsRunning ? (
-          <button 
-            className="control-button stop"
-            onClick={handleStopServer}
-          >
-            Stop Server
-          </button>
-        ) : (
-          <button 
-            className="control-button start"
-            onClick={handleStartServer}
-          >
-            Start Server
-          </button>
-        )}
+        <div className="button-container">
+          {displayIsRunning ? (
+            <button 
+              className="control-button stop"
+              onClick={handleStopServer}
+            >
+              Stop Server
+            </button>
+          ) : (
+            <button 
+              className="control-button start"
+              onClick={handleStartServer}
+            >
+              Start Server
+            </button>
+          )}
+        </div>
       </div>
       
       {displayIsRunning && (

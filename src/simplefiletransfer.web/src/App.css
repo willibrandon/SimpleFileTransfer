@@ -19,10 +19,10 @@ body {
 }
 
 .app-container {
-  max-width: 1000px; /* Reduced from 1200px for better readability */
+  max-width: 1200px; /* Increased from 1000px to accommodate the content better */
   width: 100%;
   margin: 0 auto;
-  padding: 0.5rem 2rem 2rem 2rem; /* Reduced top padding from 2rem to 0.5rem */
+  padding: 0.5rem 2rem 2rem 2rem;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   color: var(--text-color);
   display: flex;
@@ -195,20 +195,22 @@ button:disabled {
 .server-view h1,
 .client-view h1 {
   color: var(--primary-color);
+  margin-top: 0.5rem; /* Small top margin */
   margin-bottom: 0.5rem;
   font-size: 1.8rem;
 }
 
 .description {
   color: var(--dim);
-  margin-bottom: 2rem;
+  margin-bottom: 1rem; /* Reduced from 1.5rem */
 }
 
 .server-container,
 .client-container {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 2rem;
+  gap: 1.5rem;
+  padding: 0; /* Remove padding */
 }
 
 .server-control-panel,
@@ -239,12 +241,27 @@ button:disabled {
   font-size: 1.2rem;
 }
 
-.server-status,
-.queue-controls {
+.server-control-panel input[type="text"],
+.server-control-panel input[type="number"],
+.server-control-panel input[type="password"] {
+  max-width: 95%; /* Prevent inputs from touching the right edge */
+}
+
+.server-status {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: space-between; /* Changed from gap to space-between for better alignment */
   margin-bottom: 1.5rem;
+}
+
+.status-container {
+  display: flex;
+  align-items: center;
+}
+
+.button-container {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .status-indicator {
@@ -252,6 +269,9 @@ button:disabled {
   padding: 0.5rem 1rem;
   border-radius: 20px;
   font-weight: 600;
+  min-width: 80px;
+  text-align: center;
+  margin-left: 0.5rem; /* Add space between "Status:" text and the indicator */
 }
 
 .status-indicator.active {
@@ -264,6 +284,14 @@ button:disabled {
   color: white;
 }
 
+.control-button {
+  min-width: 120px;
+  max-width: 150px;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  text-align: center; /* Center text in button */
+}
+
 .control-button.start {
   background-color: var(--success-color);
 }
@@ -273,7 +301,13 @@ button:disabled {
 }
 
 .save-button {
-  margin-top: 1rem;
+  margin-top: 1.5rem;
+  width: 150px; /* Fixed width */
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Tables */
@@ -326,14 +360,16 @@ button:disabled {
   padding: 0.3rem 0.6rem;
   font-size: 0.8rem;
   margin-right: 0.5rem;
+  min-width: 60px; /* Standardize small button width */
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem; /* Add space between action buttons */
 }
 
 .open-folder-button {
   background-color: var(--dim);
-}
-
-.retry-button {
-  background-color: var(--warning);
 }
 
 .queue-buttons {
@@ -410,6 +446,7 @@ footer {
 @media (min-width: 768px) {
   .server-container {
     grid-template-columns: 1fr 1fr;
+    gap: 1.5rem; /* Consistent gap */
   }
   
   .client-container {

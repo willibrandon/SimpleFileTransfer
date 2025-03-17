@@ -198,21 +198,23 @@ export function ReceivedFiles({ files = [] }) {
                 <td>{file.sender}</td>
                 <td>{formatDate(file.receivedDate)}</td>
                 <td>
-                  <button 
-                    className={getButtonClass(file.id)}
-                    style={getButtonStyle(file.id)}
-                    onClick={() => openFile(file.id)}
-                    disabled={downloadStatus[file.id] === 'loading'}
-                  >
-                    {getButtonText(file.id)}
-                  </button>
-                  <button 
-                    className="open-folder-button"
-                    onClick={() => openFolder(file.directory)}
-                    disabled={!file.directory}
-                  >
-                    Folder
-                  </button>
+                  <div className="action-buttons">
+                    <button 
+                      className={getButtonClass(file.id)}
+                      style={getButtonStyle(file.id)}
+                      onClick={() => openFile(file.id)}
+                      disabled={downloadStatus[file.id] === 'loading'}
+                    >
+                      {getButtonText(file.id)}
+                    </button>
+                    <button 
+                      className="open-folder-button"
+                      onClick={() => openFolder(file.directory)}
+                      disabled={!file.directory}
+                    >
+                      Folder
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
