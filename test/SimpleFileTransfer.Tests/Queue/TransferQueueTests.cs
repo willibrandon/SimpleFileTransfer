@@ -17,11 +17,11 @@ public class TransferQueueTests : IDisposable
     private IDisposable? _consoleRedirection;
     
     // Platform-specific wait times
-    private static readonly int ServerStartupDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 5000 : 1000;
-    private static readonly int QueueCompletionTimeout = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 15000 : 5000;
-    private static readonly int FileProcessingDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 5000 : 1000;
-    private static readonly int MultiFileTimeout = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 20000 : 10000;
-    private static readonly int StopDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 3000 : 500;
+    private static readonly int ServerStartupDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 4000 : 1000;
+    private static readonly int QueueCompletionTimeout = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 14000 : 5000;
+    private static readonly int FileProcessingDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 4000 : 1000;
+    private static readonly int MultiFileTimeout = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 19000 : 10000;
+    private static readonly int StopDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 2000 : 500;
 
     public TransferQueueTests()
     {
