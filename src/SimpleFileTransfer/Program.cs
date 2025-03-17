@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using SimpleFileTransfer.Services;
 
 namespace SimpleFileTransfer;
 
@@ -489,6 +493,42 @@ public class Program
         else if (args[0] == "queue-clear")
         {
             Queue.Clear();
+        }
+        else if (args[0] == "--web")
+        {
+            var builder = WebApplication.CreateBuilder(args);
+
+            // Add services to the container
+            builder.Services.AddControllers();
+            builder.Services.AddCors(options =>
+            {
+                options.AddDefaultPolicy(policy =>
+                {
+                    policy.AllowAnyOrigin()
+                          .AllowAnyHeader()
+                          .AllowAnyMethod();
+                });
+            });
+
+            // Register the file transfer service
+            builder.Services.AddScoped<IFileTransferService, FileTransferService>();
+
+            var app = builder.Build();
+
+            // Configure the HTTP request pipeline
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
+            app.UseHttpsRedirection();
+            app.UseCors();
+            app.UseAuthorization();
+            app.MapControllers();
+
+            Console.WriteLine("Starting SimpleFileTransfer Web API...");
+            app.Run();
+            return;
         }
         else
         {

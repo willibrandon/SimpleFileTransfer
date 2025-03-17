@@ -218,4 +218,23 @@ dotnet run queue-clear     # Clear all transfers from the queue
 - Press Ctrl+C to stop the server
 - Make sure the port is open in your firewall if needed
 - Received files are saved to a "downloads" directory by default
-- You can combine multiple options (e.g., `--brotli --encrypt password --resume`) 
+- You can combine multiple options (e.g., `--brotli --encrypt password --resume`)
+
+## Web Interface
+
+SimpleFileTransfer includes a web interface for easy file transfers. To use the web interface:
+
+1. Start the SimpleFileTransfer API server:
+   ```
+   dotnet run --project src/SimpleFileTransfer/SimpleFileTransfer.csproj -- --web
+   ```
+
+2. Start the web application:
+   ```
+   cd src/simplefiletransfer.web
+   npm run dev
+   ```
+
+3. Open your browser and navigate to the URL shown in the console (typically http://localhost:5173)
+
+4. Use the web interface to transfer files with optional compression and encryption 

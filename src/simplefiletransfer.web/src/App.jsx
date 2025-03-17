@@ -1,34 +1,147 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [sourceFile, setSourceFile] = useState('')
+  const [destinationFile, setDestinationFile] = useState('')
+  const [isCompressed, setIsCompressed] = useState(false)
+  const [isEncrypted, setIsEncrypted] = useState(false)
+  const [password, setPassword] = useState('')
+  const [transferStatus, setTransferStatus] = useState('')
+  const [isTransferring, setIsTransferring] = useState(false)
+
+  const handleTransfer = async () => {
+    if (!sourceFile || !destinationFile) {
+      setTransferStatus('Please provide both source and destination paths')
+      return
+    }
+
+    if (isEncrypted && !password) {
+      setTransferStatus('Password is required for encryption')
+      return
+    }
+
+    setIsTransferring(true)
+    setTransferStatus('Transferring file...')
+
+    try {
+      // This would be replaced with actual API call to backend
+      const response = await fetch('/api/transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sourcePath: sourceFile,
+          destinationPath: destinationFile,
+          compress: isCompressed,
+          encrypt: isEncrypted,
+          password: isEncrypted ? password : undefined
+        }),
+      })
+
+      const data = await response.json()
+      
+      if (response.ok) {
+        setTransferStatus(`Transfer completed successfully! ${data.message || ''}`)
+      } else {
+        setTransferStatus(`Error: ${data.error || 'Unknown error occurred'}`)
+      }
+    } catch (error) {
+      setTransferStatus(`Error: ${error.message || 'Failed to connect to server'}`)
+    } finally {
+      setIsTransferring(false)
+    }
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
+    <div className="app-container">
+      <header>
+        <h1>Simple File Transfer</h1>
+        <p>Transfer files with optional compression and encryption</p>
+      </header>
+
+      <main>
+        <div className="form-group">
+          <label htmlFor="sourceFile">Source File Path:</label>
+          <input
+            type="text"
+            id="sourceFile"
+            value={sourceFile}
+            onChange={(e) => setSourceFile(e.target.value)}
+            placeholder="C:\path\to\source\file.txt"
+            disabled={isTransferring}
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="destinationFile">Destination File Path:</label>
+          <input
+            type="text"
+            id="destinationFile"
+            value={destinationFile}
+            onChange={(e) => setDestinationFile(e.target.value)}
+            placeholder="C:\path\to\destination\file.txt"
+            disabled={isTransferring}
+          />
+        </div>
+
+        <div className="options">
+          <div className="checkbox-group">
+            <input
+              type="checkbox"
+              id="compress"
+              checked={isCompressed}
+              onChange={() => setIsCompressed(!isCompressed)}
+              disabled={isTransferring}
+            />
+            <label htmlFor="compress">Compress</label>
+          </div>
+
+          <div className="checkbox-group">
+            <input
+              type="checkbox"
+              id="encrypt"
+              checked={isEncrypted}
+              onChange={() => setIsEncrypted(!isEncrypted)}
+              disabled={isTransferring}
+            />
+            <label htmlFor="encrypt">Encrypt</label>
+          </div>
+        </div>
+
+        {isEncrypted && (
+          <div className="form-group">
+            <label htmlFor="password">Password:</label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={isTransferring}
+            />
+          </div>
+        )}
+
+        <button 
+          className="transfer-button" 
+          onClick={handleTransfer}
+          disabled={isTransferring}
+        >
+          {isTransferring ? 'Transferring...' : 'Transfer File'}
         </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+
+        {transferStatus && (
+          <div className={`status ${transferStatus.includes('Error') ? 'error' : transferStatus.includes('completed') ? 'success' : ''}`}>
+            {transferStatus}
+          </div>
+        )}
+      </main>
+
+      <footer>
+        <p>SimpleFileTransfer &copy; {new Date().getFullYear()}</p>
+      </footer>
+    </div>
   )
 }
 
