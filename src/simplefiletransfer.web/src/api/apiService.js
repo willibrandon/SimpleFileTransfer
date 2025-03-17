@@ -4,6 +4,45 @@
  */
 
 const API_BASE_URL = '/api';
+const HEALTH_CHECK_URL = '/health';
+const MAX_RETRIES = 10;
+const RETRY_DELAY = 1000; // 1 second
+
+/**
+ * Check if the backend API is available
+ * @returns {Promise<boolean>} True if the API is available, false otherwise
+ */
+export const checkApiHealth = async () => {
+  try {
+    const response = await fetch(HEALTH_CHECK_URL);
+    return response.ok;
+  } catch (error) {
+    console.warn('Health check failed:', error);
+    return false;
+  }
+};
+
+/**
+ * Wait for the backend API to become available
+ * @returns {Promise<boolean>} True if the API became available, false if it timed out
+ */
+export const waitForApiAvailability = async () => {
+  console.log('Waiting for backend API to become available...');
+  
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    const isAvailable = await checkApiHealth();
+    if (isAvailable) {
+      console.log('Backend API is available!');
+      return true;
+    }
+    
+    console.log(`Backend not ready, retrying in ${RETRY_DELAY}ms... (${i + 1}/${MAX_RETRIES})`);
+    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+  }
+  
+  console.error('Backend API is not available after maximum retries');
+  return false;
+};
 
 // Server API endpoints
 export const serverApi = {
