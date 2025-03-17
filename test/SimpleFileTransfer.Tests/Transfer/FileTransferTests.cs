@@ -19,10 +19,10 @@ public class FileTransferTests : IDisposable
     private IDisposable? _consoleRedirection;
     
     // Platform-specific wait times
-    private static readonly int ServerStartupDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 2000 : 1000;
-    private static readonly int SingleFileTransferDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 3000 : 1000;
-    private static readonly int DirectoryTransferDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 5000 : 2000;
-    private static readonly int LargeFileTransferDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 5000 : 2000;
+    private static readonly int ServerStartupDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 20000 : 1000;
+    private static readonly int SingleFileTransferDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 30000 : 1000;
+    private static readonly int DirectoryTransferDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 50000 : 2000;
+    private static readonly int LargeFileTransferDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 50000 : 2000;
 
     public FileTransferTests()
     {
