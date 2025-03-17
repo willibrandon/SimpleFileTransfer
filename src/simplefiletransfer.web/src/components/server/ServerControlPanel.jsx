@@ -117,7 +117,7 @@ export function ServerControlPanel({ isRunning, port }) {
   const clearStatusMessage = () => {
     setTimeout(() => {
       setStatusMessage({ type: '', message: '' });
-    }, 5000);
+    }, 3000);
   };
   
   // Handle starting the server
@@ -128,11 +128,6 @@ export function ServerControlPanel({ isRunning, port }) {
     // Check if server is already running
     const serverRunning = await getServerStatus();
     if (serverRunning) {
-      setStatusMessage({ 
-        type: 'info', 
-        message: 'Server is already running' 
-      });
-      clearStatusMessage();
       return;
     }
     
@@ -150,12 +145,7 @@ export function ServerControlPanel({ isRunning, port }) {
         
         // Handle "Server is already running" error gracefully
         if (errorData.error === "Server is already running") {
-          setStatusMessage({ 
-            type: 'info', 
-            message: 'Server is already running' 
-          });
           setLocalIsRunning(true);
-          clearStatusMessage();
           return;
         }
         
@@ -164,13 +154,6 @@ export function ServerControlPanel({ isRunning, port }) {
       
       // Update local state
       setLocalIsRunning(true);
-      
-      // Show success message
-      setStatusMessage({ 
-        type: 'success', 
-        message: 'Server started successfully' 
-      });
-      clearStatusMessage();
     } catch (error) {
       // Show error message without console logging
       setStatusMessage({ 
@@ -198,13 +181,6 @@ export function ServerControlPanel({ isRunning, port }) {
       
       // Update local state
       setLocalIsRunning(false);
-      
-      // Show success message
-      setStatusMessage({ 
-        type: 'success', 
-        message: 'Server stopped successfully' 
-      });
-      clearStatusMessage();
     } catch (error) {
       // Show error message without console logging
       setStatusMessage({ 
@@ -233,13 +209,6 @@ export function ServerControlPanel({ isRunning, port }) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to save configuration')
       }
-      
-      // Show success message
-      setStatusMessage({ 
-        type: 'success', 
-        message: 'Configuration saved successfully' 
-      });
-      clearStatusMessage();
     } catch (error) {
       // Show error message without console logging
       setStatusMessage({ 
@@ -276,37 +245,28 @@ export function ServerControlPanel({ isRunning, port }) {
     <div className="server-control-panel">
       <h2>Server Control</h2>
       
-      {statusMessage.message && (
-        <div style={getStatusMessageStyle(statusMessage.type)}>
-          {statusMessage.message}
-        </div>
-      )}
+      {/* Server status indicator */}
+      <div className="connection-indicator">
+        <div className={`indicator-dot ${displayIsRunning ? 'connected' : 'disconnected'}`}></div>
+        <span>{displayIsRunning ? 'Running' : 'Stopped'}</span>
+      </div>
       
       <div className="server-status">
-        <div className="status-container">
-          <span>Status: </span>
-          <span className={`status-indicator ${displayIsRunning ? 'active' : 'inactive'}`}>
-            {displayIsRunning ? 'Running' : 'Stopped'}
-          </span>
-        </div>
-        
-        <div className="button-container">
-          {displayIsRunning ? (
-            <button 
-              className="control-button stop"
-              onClick={handleStopServer}
-            >
-              Stop Server
-            </button>
-          ) : (
-            <button 
-              className="control-button start"
-              onClick={handleStartServer}
-            >
-              Start Server
-            </button>
-          )}
-        </div>
+        {displayIsRunning ? (
+          <button 
+            className="control-button stop"
+            onClick={handleStopServer}
+          >
+            Stop Server
+          </button>
+        ) : (
+          <button 
+            className="control-button start"
+            onClick={handleStartServer}
+          >
+            Start Server
+          </button>
+        )}
       </div>
       
       {displayIsRunning && (
@@ -377,6 +337,15 @@ export function ServerControlPanel({ isRunning, port }) {
       >
         Save Configuration
       </button>
+      
+      {/* Only show error messages */}
+      {statusMessage.type === 'error' && statusMessage.message && (
+        <div className="toast-container">
+          <div className={`toast-message error visible`}>
+            {statusMessage.message}
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
