@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import { ThemeIndicator } from './ThemeIndicator'
 
 function App() {
   const [sourceFile, setSourceFile] = useState('')
@@ -141,6 +142,8 @@ function App() {
       <footer>
         <p>SimpleFileTransfer &copy; {new Date().getFullYear()}</p>
       </footer>
+      
+      <ThemeIndicator />
     </div>
   )
 }

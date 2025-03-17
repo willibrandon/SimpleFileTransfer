@@ -1,11 +1,11 @@
 :root {
-  --primary-color: #3498db;
-  --primary-dark: #2980b9;
-  --success-color: #2ecc71;
-  --error-color: #e74c3c;
-  --text-color: #333;
-  --light-bg: #f5f5f5;
-  --border-color: #ddd;
+  --primary-color: var(--info);
+  --primary-dark: var(--info-dark);
+  --success-color: var(--success);
+  --error-color: var(--error);
+  --text-color: var(--text);
+  --light-bg: var(--bg-highlight);
+  --border-color: var(--dim);
 }
 
 .app-container {
@@ -17,6 +17,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background-color: var(--bg);
 }
 
 header {
@@ -30,12 +31,12 @@ header h1 {
 }
 
 header p {
-  color: #666;
+  color: var(--dim);
   font-size: 1.1rem;
 }
 
 main {
-  background-color: white;
+  background-color: var(--bg-highlight);
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   padding: 2rem;
@@ -50,6 +51,7 @@ label {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
+  color: var(--text);
 }
 
 input[type="text"],
@@ -60,6 +62,8 @@ input[type="password"] {
   border-radius: 4px;
   font-size: 1rem;
   transition: border-color 0.2s;
+  background-color: var(--bg);
+  color: var(--text);
 }
 
 input[type="text"]:focus,
@@ -105,7 +109,7 @@ input[type="password"]:focus {
 }
 
 .transfer-button:disabled {
-  background-color: #95a5a6;
+  background-color: var(--dim);
   cursor: not-allowed;
 }
 
@@ -132,8 +136,30 @@ input[type="password"]:focus {
 footer {
   margin-top: 2rem;
   text-align: center;
-  color: #666;
+  color: var(--dim);
   font-size: 0.9rem;
+}
+
+/* Theme indicator styles */
+#theme-indicator {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  background-color: var(--bg-highlight);
+  color: var(--dim);
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
+#theme-indicator:hover {
+  color: var(--text);
+  transform: translateY(-2px);
 }
 
 @media (max-width: 600px) {
@@ -148,5 +174,12 @@ footer {
   .options {
     flex-direction: column;
     gap: 1rem;
+  }
+  
+  #theme-indicator {
+    bottom: 0.5rem;
+    right: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.7rem;
   }
 }
