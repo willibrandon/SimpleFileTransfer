@@ -871,3 +871,32 @@ footer {
   color: #aaaaaa; /* Updated to lighter gray text */
   border: 1px solid #333333; /* Dark border */
 }
+
+/* Dark mode pagination styles */
+[data-theme="dark"] .pagination-button {
+  background-color: #111111;
+  color: #aaaaaa;
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .pagination-button:hover {
+  background-color: #181818;
+  color: #cccccc;
+}
+
+[data-theme="dark"] .pagination-button.active {
+  background-color: #222222;
+  color: #aaaaaa;
+  border-color: #333333;
+}
+
+[data-theme="dark"] .pagination-button:disabled {
+  background-color: #0a0a0a;
+  color: #555555;
+  border-color: #222222;
+  opacity: 0.5;
+}
+
+[data-theme="dark"] .pagination-info {
+  color: #666666;
+}

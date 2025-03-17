@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Pagination } from '../common/Pagination'
 
 export function ReceivedFiles({ files = [], isLoading = false }) {
   const [downloadStatus, setDownloadStatus] = useState({});
   const [validFiles, setValidFiles] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
+  const prevFilesLengthRef = useRef(0);
   
   // Process files to ensure they have valid data
   useEffect(() => {
@@ -30,8 +34,28 @@ export function ReceivedFiles({ files = [], isLoading = false }) {
     });
     
     console.log('ReceivedFiles filtered and sorted valid files:', sorted);
+    
+    // Only reset to first page when the number of files changes significantly
+    // This prevents resetting pagination when just refreshing the same data
+    const newFilesLength = sorted.length;
+    if (Math.abs(newFilesLength - prevFilesLengthRef.current) > 1) {
+      setCurrentPage(1);
+    }
+    prevFilesLengthRef.current = newFilesLength;
+    
     setValidFiles(sorted);
   }, [files]);
+
+  // Get current page files
+  const indexOfLastFile = currentPage * itemsPerPage;
+  const indexOfFirstFile = indexOfLastFile - itemsPerPage;
+  const currentFiles = validFiles.slice(indexOfFirstFile, indexOfLastFile);
+  const totalPages = Math.ceil(validFiles.length / itemsPerPage);
+
+  // Change page
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
 
   const formatFileSize = (bytes) => {
     if (bytes === undefined || bytes === null || bytes === 0) return '0 Bytes'
@@ -276,52 +300,71 @@ export function ReceivedFiles({ files = [], isLoading = false }) {
             border-radius: 4px;
             margin-top: 1rem;
           }
+          
+          .files-count {
+            color: var(--dim);
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+            text-align: right;
+          }
         `}
       </style>
       
       {!validFiles || validFiles.length === 0 ? (
         <div className="no-files">No files received yet</div>
       ) : (
-        <ul className="files-list">
-          {validFiles.map((file) => (
-            <li key={file.id} className="file-item">
-              <div className="file-item-header">
-                <span className="file-name">{file.fileName}</span>
-                <span className="file-size">{formatFileSize(file.size)}</span>
-              </div>
-              
-              <div className="file-item-details">
-                <div>
-                  <span className="detail-label">Sender: </span>
-                  {file.sender || 'Unknown'}
+        <>
+          <div className="files-count">
+            Showing {indexOfFirstFile + 1}-{Math.min(indexOfLastFile, validFiles.length)} of {validFiles.length} files
+          </div>
+          
+          <ul className="files-list">
+            {currentFiles.map((file) => (
+              <li key={file.id} className="file-item">
+                <div className="file-item-header">
+                  <span className="file-name">{file.fileName}</span>
+                  <span className="file-size">{formatFileSize(file.size)}</span>
                 </div>
                 
-                <div>
-                  <span className="detail-label">Received: </span>
-                  {formatDate(file.receivedDate)}
+                <div className="file-item-details">
+                  <div>
+                    <span className="detail-label">Sender: </span>
+                    {file.sender || 'Unknown'}
+                  </div>
+                  
+                  <div>
+                    <span className="detail-label">Received: </span>
+                    {formatDate(file.receivedDate)}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="file-item-actions">
-                <button 
-                  className={getButtonClass(file.id)}
-                  style={getButtonStyle(file.id)}
-                  onClick={() => openFile(file.id)}
-                  disabled={downloadStatus[file.id] === 'loading'}
-                >
-                  {getButtonText(file.id)}
-                </button>
-                <button 
-                  className="open-folder-button"
-                  onClick={() => openFolder(file.directory)}
-                  disabled={!file.directory}
-                >
-                  Folder
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+                
+                <div className="file-item-actions">
+                  <button 
+                    className={getButtonClass(file.id)}
+                    style={getButtonStyle(file.id)}
+                    onClick={() => openFile(file.id)}
+                    disabled={downloadStatus[file.id] === 'loading'}
+                  >
+                    {getButtonText(file.id)}
+                  </button>
+                  <button 
+                    className="open-folder-button"
+                    onClick={() => openFolder(file.directory)}
+                    disabled={!file.directory}
+                  >
+                    Folder
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        </>
       )}
     </div>
   )

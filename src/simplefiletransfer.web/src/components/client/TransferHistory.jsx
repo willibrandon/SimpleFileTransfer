@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { clientApi } from '../../api/apiService';
+import { Pagination } from '../common/Pagination';
 
 export function TransferHistory({ transfers = [], isLoading = false, error = '', refreshHistory }) {
   const [history, setHistory] = useState([]);
   const [localError, setLocalError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [statusType, setStatusType] = useState(''); // 'success', 'error'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
+  const prevTransfersLengthRef = useRef(0);
 
   // Process transfers prop
   useEffect(() => {
@@ -17,10 +21,29 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
         return dateB - dateA; // Descending order
       });
       
+      // Only reset to first page when the number of transfers changes significantly
+      // This prevents resetting pagination when just refreshing the same data
+      const newTransfersLength = sortedTransfers.length;
+      if (Math.abs(newTransfersLength - prevTransfersLengthRef.current) > 1) {
+        setCurrentPage(1);
+      }
+      prevTransfersLengthRef.current = newTransfersLength;
+      
       // Set history state with sorted transfers
       setHistory(sortedTransfers);
     }
   }, [transfers]);
+
+  // Get current page transfers
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = history.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(history.length / itemsPerPage);
+
+  // Change page
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
 
   // Handle error prop
   useEffect(() => {
@@ -220,6 +243,13 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
             border-radius: 4px;
             margin-top: 1rem;
           }
+          
+          .history-count {
+            color: var(--dim);
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+            text-align: right;
+          }
         `}
       </style>
       
@@ -229,69 +259,81 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
           {isLoading ? ' (loading...)' : ''}
         </div>
       ) : (
-        <ul className="history-list">
-          {history.map((transfer) => {
-            const fileName = transfer.fileName || transfer.FileName;
-            const size = formatFileSize(transfer.size || transfer.Size);
-            const destination = `${(transfer.host || transfer.Host || transfer.targetHost || transfer.TargetHost || 'Unknown')}:${transfer.port || transfer.Port || 0}`;
-            const status = transfer.status || transfer.Status || '';
-            const statusLower = String(status).toLowerCase();
-            const startTime = formatDate(transfer.startTime || transfer.StartTime);
-            const endTime = formatDate(transfer.endTime || transfer.EndTime);
-            
-            let statusClass = '';
-            if (statusLower.includes('complet')) statusClass = 'status-completed';
-            else if (statusLower.includes('fail')) statusClass = 'status-failed';
-            else if (statusLower.includes('progress')) statusClass = 'status-inprogress';
-            
-            return (
-              <li key={transfer.id || transfer.Id} className="history-item">
-                <div className="history-item-header">
-                  <span className="file-name">{fileName}</span>
-                  <span className="file-size">{size}</span>
-                </div>
-                
-                <div className="history-item-details">
-                  <div>
-                    <span className="detail-label">Destination: </span>
-                    {destination}
+        <>
+          <div className="history-count">
+            Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, history.length)} of {history.length} transfers
+          </div>
+          
+          <ul className="history-list">
+            {currentItems.map((transfer) => {
+              const fileName = transfer.fileName || transfer.FileName;
+              const size = formatFileSize(transfer.size || transfer.Size);
+              const destination = `${(transfer.host || transfer.Host || transfer.targetHost || transfer.TargetHost || 'Unknown')}:${transfer.port || transfer.Port || 0}`;
+              const status = transfer.status || transfer.Status || '';
+              const statusLower = String(status).toLowerCase();
+              const startTime = formatDate(transfer.startTime || transfer.StartTime);
+              const endTime = formatDate(transfer.endTime || transfer.EndTime);
+              
+              let statusClass = '';
+              if (statusLower.includes('complet')) statusClass = 'status-completed';
+              else if (statusLower.includes('fail')) statusClass = 'status-failed';
+              else if (statusLower.includes('progress')) statusClass = 'status-inprogress';
+              
+              return (
+                <li key={transfer.id || transfer.Id} className="history-item">
+                  <div className="history-item-header">
+                    <span className="file-name">{fileName}</span>
+                    <span className="file-size">{size}</span>
                   </div>
                   
-                  <div>
-                    <span className="detail-label">Status: </span>
-                    <span className={statusClass}>
-                      {statusLower.includes('complet') ? 'Completed' : 
-                       statusLower.includes('fail') ? 'Failed' :
-                       statusLower.includes('progress') ? 'In Progress' : 
-                       status || 'Unknown'}
-                    </span>
+                  <div className="history-item-details">
+                    <div>
+                      <span className="detail-label">Destination: </span>
+                      {destination}
+                    </div>
+                    
+                    <div>
+                      <span className="detail-label">Status: </span>
+                      <span className={statusClass}>
+                        {statusLower.includes('complet') ? 'Completed' : 
+                         statusLower.includes('fail') ? 'Failed' :
+                         statusLower.includes('progress') ? 'In Progress' : 
+                         status || 'Unknown'}
+                      </span>
+                    </div>
+                    
+                    <div>
+                      <span className="detail-label">Started: </span>
+                      {startTime}
+                    </div>
+                    
+                    <div>
+                      <span className="detail-label">Completed: </span>
+                      {endTime}
+                    </div>
                   </div>
                   
-                  <div>
-                    <span className="detail-label">Started: </span>
-                    {startTime}
-                  </div>
-                  
-                  <div>
-                    <span className="detail-label">Completed: </span>
-                    {endTime}
-                  </div>
-                </div>
-                
-                {statusLower.includes('fail') && (
-                  <div className="history-item-actions">
-                    <button 
-                      className="retry-button"
-                      onClick={() => handleRetry(transfer)}
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                  {statusLower.includes('fail') && (
+                    <div className="history-item-actions">
+                      <button 
+                        className="retry-button"
+                        onClick={() => handleRetry(transfer)}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        </>
       )}
     </div>
   );
