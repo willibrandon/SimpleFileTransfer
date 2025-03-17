@@ -1,0 +1,187 @@
+/**
+ * API Service for SimpleFileTransfer
+ * Handles all communication with the backend API
+ */
+
+const API_BASE_URL = '/api';
+
+// Server API endpoints
+export const serverApi = {
+  // Get server status
+  getStatus: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/server/status`);
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching server status:', error);
+      throw error;
+    }
+  },
+
+  // Start the server
+  start: async (config) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/server/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error starting server:', error);
+      throw error;
+    }
+  },
+
+  // Stop the server
+  stop: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/server/stop`, {
+        method: 'POST',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error stopping server:', error);
+      throw error;
+    }
+  },
+
+  // Get server configuration
+  getConfig: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/server/config`);
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching server config:', error);
+      throw error;
+    }
+  },
+
+  // Update server configuration
+  updateConfig: async (config) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/server/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating server config:', error);
+      throw error;
+    }
+  },
+
+  // Get list of received files
+  getFiles: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/server/files`);
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching received files:', error);
+      throw error;
+    }
+  },
+};
+
+// Client API endpoints
+export const clientApi = {
+  // Send a file
+  sendFile: async (transferRequest) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/transfer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transferRequest),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error sending file:', error);
+      throw error;
+    }
+  },
+
+  // Add a transfer to the queue
+  queueTransfer: async (transferRequest) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/client/queue`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transferRequest),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error queuing transfer:', error);
+      throw error;
+    }
+  },
+
+  // Get queue status
+  getQueue: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/client/queue`);
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching queue status:', error);
+      throw error;
+    }
+  },
+
+  // Start queue processing
+  startQueue: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/client/queue/start`, {
+        method: 'POST',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error starting queue:', error);
+      throw error;
+    }
+  },
+
+  // Stop queue processing
+  stopQueue: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/client/queue/stop`, {
+        method: 'POST',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error stopping queue:', error);
+      throw error;
+    }
+  },
+
+  // Clear the queue
+  clearQueue: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/client/queue/clear`, {
+        method: 'POST',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error clearing queue:', error);
+      throw error;
+    }
+  },
+
+  // Get transfer history
+  getHistory: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/client/history`);
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching transfer history:', error);
+      throw error;
+    }
+  },
+}; 
