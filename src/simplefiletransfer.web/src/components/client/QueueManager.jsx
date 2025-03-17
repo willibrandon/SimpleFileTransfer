@@ -16,7 +16,7 @@ export function QueueManager({ isProcessing: initialIsProcessing, count, onProce
     }
   }, [isProcessing, initialIsProcessing, onProcessingChange]);
 
-  // Fetch queue status on component mount
+  // Fetch queue status on component mount - only once
   useEffect(() => {
     const fetchQueue = async () => {
       try {
@@ -33,14 +33,14 @@ export function QueueManager({ isProcessing: initialIsProcessing, count, onProce
       }
     };
 
+    // Fetch only once on mount, rely on WebSocket for updates
     fetchQueue();
-    
-    // Set up polling to refresh the queue status every 3 seconds
-    const interval = setInterval(fetchQueue, 3000);
-    
-    // Clean up interval on component unmount
-    return () => clearInterval(interval);
   }, []);
+
+  // Update local state when props change
+  useEffect(() => {
+    setIsProcessing(initialIsProcessing);
+  }, [initialIsProcessing]);
 
   // Handle starting the queue
   const handleStartQueue = async () => {
