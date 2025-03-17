@@ -1,6 +1,8 @@
 using SimpleFileTransfer.Helpers;
 using SimpleFileTransfer.Queue;
+using SimpleFileTransfer.Tests.Helpers;
 using SimpleFileTransfer.Transfer;
+using System.Runtime.InteropServices;
 
 namespace SimpleFileTransfer.Tests.Queue;
 
@@ -12,8 +14,14 @@ public class TransferQueueTests : IDisposable
     private CancellationTokenSource? _serverCts;
     private const string TestPassword = "testpassword123";
     private static int _portCounter = 9900; // Start from a different port than FileTransferTests
-    private StringWriter? _consoleWriter;
-    private TextWriter? _originalConsole;
+    private IDisposable? _consoleRedirection;
+    
+    // Platform-specific wait times
+    private static readonly int ServerStartupDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 2000 : 1000;
+    private static readonly int QueueCompletionTimeout = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 10000 : 5000;
+    private static readonly int FileProcessingDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 2000 : 1000;
+    private static readonly int MultiFileTimeout = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 15000 : 10000;
+    private static readonly int StopDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 1000 : 500;
 
     public TransferQueueTests()
     {
@@ -23,6 +31,9 @@ public class TransferQueueTests : IDisposable
         Directory.CreateDirectory(_testDir);
         Directory.CreateDirectory(_downloadDir);
         Program.DownloadsDirectory = _downloadDir;
+        
+        // Set up console redirection for all tests using the shared helper
+        _consoleRedirection = ConsoleRedirector.RedirectConsole();
     }
 
     public void Dispose()
@@ -41,21 +52,8 @@ public class TransferQueueTests : IDisposable
                 }
             }
             
-            // Restore original console output
-            if (_originalConsole != null)
-            {
-                try
-                {
-                    Console.SetOut(_originalConsole);
-                }
-                catch (Exception)
-                {
-                    // Ignore any errors during cleanup
-                }
-            }
-            
-            // Dispose the console writer
-            _consoleWriter?.Dispose();
+            // Dispose the console redirection
+            _consoleRedirection?.Dispose();
             
             // Clean up test directories
             try
@@ -85,11 +83,6 @@ public class TransferQueueTests : IDisposable
         
         _serverCts = new CancellationTokenSource();
         
-        // Create StringWriter outside the task so it won't be disposed while the server is running
-        var writer = new StringWriter();
-        var originalOut = Console.Out;
-        Console.SetOut(writer);
-        
         _serverTask = Task.Run(() =>
         {
             try
@@ -114,12 +107,8 @@ public class TransferQueueTests : IDisposable
                 }
             }
         });
-
-        // Store the writer and original console for cleanup in Dispose
-        _consoleWriter = writer;
-        _originalConsole = originalOut;
         
-        await Task.Delay(1000); // Give time for server to start
+        await Task.Delay(ServerStartupDelay); // Give time for server to start
         return port;
     }
 
@@ -172,11 +161,11 @@ public class TransferQueueTests : IDisposable
         queue.Start();
 
         // Wait for the transfer to complete with a timeout
-        var completed = await Task.WhenAny(transferCompleted.Task, Task.Delay(5000));
+        var completed = await Task.WhenAny(transferCompleted.Task, Task.Delay(QueueCompletionTimeout));
         var success = completed == transferCompleted.Task && await transferCompleted.Task;
         
         // Add a delay to give the server time to process the file
-        await Task.Delay(1000);
+        await Task.Delay(FileProcessingDelay);
 
         // Assert
         var downloadedFile = Path.Combine(_downloadDir, "queue_test.txt");
@@ -222,11 +211,11 @@ public class TransferQueueTests : IDisposable
         queue.Start();
 
         // Wait for all transfers to complete with a timeout
-        var completed = await Task.WhenAny(allCompleted.Task, Task.Delay(10000));
+        var completed = await Task.WhenAny(allCompleted.Task, Task.Delay(MultiFileTimeout));
         var success = completed == allCompleted.Task && await allCompleted.Task;
         
         // Add a delay to give the server time to process the files
-        await Task.Delay(1000);
+        await Task.Delay(FileProcessingDelay);
 
         // Assert
         Assert.True(success, "All transfers should complete successfully");
@@ -271,11 +260,11 @@ public class TransferQueueTests : IDisposable
         queue.Start();
 
         // Wait for the transfer to complete with a timeout
-        var completed = await Task.WhenAny(transferCompleted.Task, Task.Delay(5000));
+        var completed = await Task.WhenAny(transferCompleted.Task, Task.Delay(QueueCompletionTimeout));
         var success = completed == transferCompleted.Task && await transferCompleted.Task;
         
         // Add a delay to give the server time to process the files
-        await Task.Delay(1000);
+        await Task.Delay(FileProcessingDelay);
 
         // Assert
         Assert.True(success, "Transfer should complete successfully");
@@ -315,11 +304,11 @@ public class TransferQueueTests : IDisposable
         queue.Start();
 
         // Wait for the transfer to complete with a timeout
-        var completed = await Task.WhenAny(transferCompleted.Task, Task.Delay(5000));
+        var completed = await Task.WhenAny(transferCompleted.Task, Task.Delay(QueueCompletionTimeout));
         var success = completed == transferCompleted.Task && await transferCompleted.Task;
         
         // Add a delay to give the server time to process the files
-        await Task.Delay(1000);
+        await Task.Delay(FileProcessingDelay);
 
         // Assert
         Assert.True(success, "Transfer should complete successfully");
@@ -364,11 +353,11 @@ public class TransferQueueTests : IDisposable
         queue.Start();
 
         // Wait for the transfer to complete with a timeout
-        var completed = await Task.WhenAny(transferCompleted.Task, Task.Delay(5000));
+        var completed = await Task.WhenAny(transferCompleted.Task, Task.Delay(QueueCompletionTimeout));
         var success = completed == transferCompleted.Task && await transferCompleted.Task;
         
         // Add a delay to give the server time to process the file
-        await Task.Delay(1000);
+        await Task.Delay(FileProcessingDelay);
 
         // Assert
         Assert.True(success, "Transfer should complete successfully");
@@ -406,11 +395,11 @@ public class TransferQueueTests : IDisposable
         queue.Start();
 
         // Wait for the transfer to complete with a timeout
-        var completed = await Task.WhenAny(transferCompleted.Task, Task.Delay(5000));
+        var completed = await Task.WhenAny(transferCompleted.Task, Task.Delay(QueueCompletionTimeout));
         var success = completed == transferCompleted.Task && await transferCompleted.Task;
         
         // Add a delay to give the server time to process the file
-        await Task.Delay(1000);
+        await Task.Delay(FileProcessingDelay);
 
         // Assert
         Assert.True(success, "Transfer should complete successfully");
@@ -448,13 +437,13 @@ public class TransferQueueTests : IDisposable
         queue.Start();
 
         // Wait for the first transfer to complete
-        await Task.WhenAny(transferStarted.Task, Task.Delay(5000));
+        await Task.WhenAny(transferStarted.Task, Task.Delay(QueueCompletionTimeout));
         
         // Stop the queue
         queue.Stop();
         
         // Wait a moment for the stop to take effect
-        await Task.Delay(500);
+        await Task.Delay(StopDelay);
         
         // Assert
         Assert.False(queue.IsProcessing, "Queue should not be processing after stop");
@@ -475,38 +464,24 @@ public class TransferQueueTests : IDisposable
     public void QueueClear_RemovesAllTransfers()
     {
         // Arrange
-        // Set up console redirection
-        var writer = new StringWriter();
-        var originalOut = Console.Out;
-        Console.SetOut(writer);
+        var file1 = CreateTestFile("queue_clear1.txt", "Queue clear test 1");
+        var file2 = CreateTestFile("queue_clear2.txt", "Queue clear test 2");
+        var file3 = CreateTestFile("queue_clear3.txt", "Queue clear test 3");
+
+        // Create a new queue for this test
+        var queue = new TransferQueue();
+
+        // Act
+        queue.Enqueue(new QueuedFileTransfer("localhost", file1));
+        queue.Enqueue(new QueuedFileTransfer("localhost", file2));
+        queue.Enqueue(new QueuedFileTransfer("localhost", file3));
         
-        try
-        {
-            var file1 = CreateTestFile("queue_clear1.txt", "Queue clear test 1");
-            var file2 = CreateTestFile("queue_clear2.txt", "Queue clear test 2");
-            var file3 = CreateTestFile("queue_clear3.txt", "Queue clear test 3");
-
-            // Create a new queue for this test
-            var queue = new TransferQueue();
-
-            // Act
-            queue.Enqueue(new QueuedFileTransfer("localhost", file1));
-            queue.Enqueue(new QueuedFileTransfer("localhost", file2));
-            queue.Enqueue(new QueuedFileTransfer("localhost", file3));
-            
-            Assert.Equal(3, queue.Count);
-            
-            queue.Clear();
-            
-            // Assert
-            Assert.Equal(0, queue.Count);
-        }
-        finally
-        {
-            // Restore console
-            Console.SetOut(originalOut);
-            writer.Dispose();
-        }
+        Assert.Equal(3, queue.Count);
+        
+        queue.Clear();
+        
+        // Assert
+        Assert.Equal(0, queue.Count);
     }
 
     [Fact]
@@ -559,11 +534,11 @@ public class TransferQueueTests : IDisposable
         queue.Start();
 
         // Wait for all transfers to complete with a timeout
-        var completed = await Task.WhenAny(allCompleted.Task, Task.Delay(10000));
+        var completed = await Task.WhenAny(allCompleted.Task, Task.Delay(MultiFileTimeout));
         var success = completed == allCompleted.Task && await allCompleted.Task;
         
         // Add a delay to give the server time to process the files
-        await Task.Delay(1000);
+        await Task.Delay(FileProcessingDelay);
 
         // Assert
         Assert.True(success, "All transfers should complete successfully");

@@ -1,6 +1,8 @@
 using SimpleFileTransfer.Helpers;
 using SimpleFileTransfer.Queue;
+using SimpleFileTransfer.Tests.Helpers;
 using SimpleFileTransfer.Transfer;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -14,8 +16,13 @@ public class FileTransferTests : IDisposable
     private CancellationTokenSource? _serverCts;
     private const string TestPassword = "testpassword123";
     private static int _portCounter = 9876;
-    private StringWriter? _consoleWriter;
-    private TextWriter? _originalConsole;
+    private IDisposable? _consoleRedirection;
+    
+    // Platform-specific wait times
+    private static readonly int ServerStartupDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 2000 : 1000;
+    private static readonly int SingleFileTransferDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 3000 : 1000;
+    private static readonly int DirectoryTransferDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 5000 : 2000;
+    private static readonly int LargeFileTransferDelay = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 5000 : 2000;
 
     public FileTransferTests()
     {
@@ -25,6 +32,9 @@ public class FileTransferTests : IDisposable
         Directory.CreateDirectory(_testDir);
         Directory.CreateDirectory(_downloadDir);
         Program.DownloadsDirectory = _downloadDir;
+        
+        // Set up console redirection for all tests using the shared helper
+        _consoleRedirection = ConsoleRedirector.RedirectConsole();
     }
 
     public void Dispose()
@@ -43,21 +53,8 @@ public class FileTransferTests : IDisposable
                 }
             }
             
-            // Restore original console output
-            if (_originalConsole != null)
-            {
-                try
-                {
-                    Console.SetOut(_originalConsole);
-                }
-                catch (Exception)
-                {
-                    // Ignore any errors during cleanup
-                }
-            }
-            
-            // Dispose the console writer
-            _consoleWriter?.Dispose();
+            // Dispose the console redirection
+            _consoleRedirection?.Dispose();
             
             // Clean up temporary directories
             try
@@ -87,10 +84,6 @@ public class FileTransferTests : IDisposable
         
         _serverCts = new CancellationTokenSource();
         
-        // Create StringWriter outside the task so it won't be disposed while the server is running
-        var writer = new StringWriter();
-        var originalOut = Console.Out;
-        Console.SetOut(writer);
         
         _serverTask = Task.Run(() =>
         {
@@ -116,12 +109,8 @@ public class FileTransferTests : IDisposable
                 }
             }
         });
-
-        // Store the writer and original console for cleanup in Dispose
-        _consoleWriter = writer;
-        _originalConsole = originalOut;
         
-        await Task.Delay(1000); // Give time for server to start
+        await Task.Delay(ServerStartupDelay); // Give time for server to start
         return port;
     }
 
@@ -187,7 +176,7 @@ public class FileTransferTests : IDisposable
         // Act
         var client = new FileTransferClient("localhost", port);
         client.SendFile(testFile);
-        await Task.Delay(1000); // Give time for transfer to complete
+        await Task.Delay(SingleFileTransferDelay); // Give time for transfer to complete
 
         // Assert
         var downloadedFile = Path.Combine(_downloadDir, "test.txt");
@@ -211,7 +200,7 @@ public class FileTransferTests : IDisposable
         // Act
         var client = new FileTransferClient("localhost", port);
         client.SendDirectory(testDir);
-        await Task.Delay(2000); // Give time for transfer to complete
+        await Task.Delay(DirectoryTransferDelay); // Give time for transfer to complete
 
         // Assert
         foreach (var (file, content) in files)
@@ -233,7 +222,7 @@ public class FileTransferTests : IDisposable
         // Act
         var client = new FileTransferClient("localhost", port);
         client.SendFile(testFile);
-        await Task.Delay(2000); // Give more time for large file
+        await Task.Delay(LargeFileTransferDelay); // Give more time for large file
 
         // Assert
         var downloadedFile = Path.Combine(_downloadDir, "large.txt");
@@ -253,7 +242,7 @@ public class FileTransferTests : IDisposable
         // Act
         var client = new FileTransferClient("localhost", port);
         client.SendFile(testFile);
-        await Task.Delay(1000);
+        await Task.Delay(SingleFileTransferDelay);
 
         // Assert
         var downloadedFile = Path.Combine(_downloadDir, "hash_test.txt");
@@ -288,7 +277,7 @@ public class FileTransferTests : IDisposable
         // Act
         var client = new FileTransferClient("localhost", port, useCompression: true, algorithm);
         client.SendFile(testFile);
-        await Task.Delay(3000); // Give time for transfer to complete
+        await Task.Delay(SingleFileTransferDelay); // Give time for transfer to complete
 
         // Assert
         var downloadedFile = Path.Combine(_downloadDir, $"compressed_{algorithm}.txt");
@@ -314,7 +303,7 @@ public class FileTransferTests : IDisposable
         // Act
         var client = new FileTransferClient("localhost", port, useCompression: true, algorithm);
         client.SendDirectory(testDir);
-        await Task.Delay(3000); // Give time for transfer to complete
+        await Task.Delay(SingleFileTransferDelay); // Give time for transfer to complete
 
         // Assert
         foreach (var (file, content) in files)
@@ -343,7 +332,7 @@ public class FileTransferTests : IDisposable
             TestPassword);
             
         client.SendFile(testFile);
-        await Task.Delay(3000); // Give time for transfer to complete
+        await Task.Delay(SingleFileTransferDelay); // Give time for transfer to complete
 
         // Assert
         var downloadedFile = Path.Combine(_downloadDir, "encrypted.txt");
@@ -369,7 +358,7 @@ public class FileTransferTests : IDisposable
             TestPassword);
             
         client.SendFile(testFile);
-        await Task.Delay(3000); // Give time for transfer to complete
+        await Task.Delay(SingleFileTransferDelay); // Give time for transfer to complete
 
         // Assert
         var downloadedFile = Path.Combine(_downloadDir, "encrypted_compressed.txt");
@@ -400,7 +389,7 @@ public class FileTransferTests : IDisposable
             TestPassword);
             
         client.SendDirectory(testDir);
-        await Task.Delay(3000); // Give time for transfer to complete
+        await Task.Delay(SingleFileTransferDelay); // Give time for transfer to complete
 
         // Assert
         foreach (var (file, content) in files)
@@ -429,7 +418,7 @@ public class FileTransferTests : IDisposable
             TestPassword);
             
         client.SendFile(testFile);
-        await Task.Delay(3000); // Give time for transfer to complete
+        await Task.Delay(SingleFileTransferDelay); // Give time for transfer to complete
 
         // Assert
         var downloadedFile = Path.Combine(_downloadDir, "encrypted_wrong_password.txt");
@@ -531,7 +520,7 @@ public class FileTransferTests : IDisposable
         // Act
         var client = new FileTransferClient("localhost", port);
         client.SendMultipleFiles(files);
-        await Task.Delay(3000); // Give more time for transfer to complete
+        await Task.Delay(SingleFileTransferDelay); // Give more time for transfer to complete
         
         // Assert
         foreach (var file in files)
@@ -561,7 +550,7 @@ public class FileTransferTests : IDisposable
             useCompression: true, 
             compressionAlgorithm: CompressionHelper.CompressionAlgorithm.GZip);
         client.SendMultipleFiles(files);
-        await Task.Delay(3000); // Give more time for transfer to complete
+        await Task.Delay(SingleFileTransferDelay); // Give more time for transfer to complete
         
         // Assert
         foreach (var file in files)
@@ -591,7 +580,7 @@ public class FileTransferTests : IDisposable
             useEncryption: true, 
             password: TestPassword);
         client.SendMultipleFiles(files);
-        await Task.Delay(3000); // Give more time for transfer to complete
+        await Task.Delay(SingleFileTransferDelay); // Give more time for transfer to complete
         
         // Assert
         foreach (var file in files)
