@@ -64,7 +64,8 @@ public class ClientController : ControllerBase
                 request.CompressionAlgorithm,
                 request.UseEncryption,
                 request.Password,
-                request.ResumeEnabled);
+                request.ResumeEnabled,
+                request.SpeedLimit);
             
             // Add to history
             var historyItem = new TransferHistoryItem
@@ -77,7 +78,8 @@ public class ClientController : ControllerBase
                 StartTime = DateTime.Now,
                 Status = TransferStatus.InProgress,
                 UseCompression = request.UseCompression,
-                UseEncryption = request.UseEncryption
+                UseEncryption = request.UseEncryption,
+                SpeedLimit = request.SpeedLimit
             };
             
             _history.Add(historyItem);
@@ -204,27 +206,8 @@ public class ClientController : ControllerBase
                 Path.GetDirectoryName(tempFile) ?? string.Empty,
                 originalFileName);
             
-            // If a file with this name already exists, delete it
-            if (System.IO.File.Exists(tempFileWithExt))
-            {
-                System.IO.File.Delete(tempFileWithExt);
-            }
-            
-            // Rename the temp file to have the correct filename
-            System.IO.File.Move(tempFile, tempFileWithExt);
-            
-            // Create a queued transfer
-            var transfer = new QueuedFileTransfer(
-                request.Host,
-                tempFileWithExt,
-                request.UseCompression,
-                request.CompressionAlgorithm,
-                request.UseEncryption,
-                request.Password,
-                request.ResumeEnabled);
-            
-            // Add to queue
-            _queue.Enqueue(transfer);
+            // Rename the temporary file
+            System.IO.File.Move(tempFile, tempFileWithExt, true);
             
             // Add to history
             var historyItem = new TransferHistoryItem
@@ -237,7 +220,8 @@ public class ClientController : ControllerBase
                 StartTime = DateTime.Now,
                 Status = TransferStatus.Queued,
                 UseCompression = request.UseCompression,
-                UseEncryption = request.UseEncryption
+                UseEncryption = request.UseEncryption,
+                SpeedLimit = request.SpeedLimit
             };
             
             _history.Add(historyItem);
@@ -246,18 +230,21 @@ public class ClientController : ControllerBase
             await WebSocketServer.BroadcastEventAsync(new WebSocketEvent
             {
                 Type = "transfer_queued",
-                Data = new
-                {
-                    id = historyItem.Id,
-                    fileName = historyItem.FileName,
-                    host = historyItem.Host,
-                    port = historyItem.Port,
-                    size = historyItem.Size,
-                    queuedAt = historyItem.StartTime,
-                    useCompression = historyItem.UseCompression,
-                    useEncryption = historyItem.UseEncryption
-                }
+                Data = historyItem
             });
+            
+            // Add to queue
+            var transfer = new QueuedFileTransfer(
+                request.Host,
+                tempFileWithExt,
+                request.UseCompression,
+                request.CompressionAlgorithm,
+                request.UseEncryption,
+                request.Password,
+                request.ResumeEnabled,
+                request.SpeedLimit);
+            
+            _queue.Enqueue(transfer);
             
             return Ok(new { message = "File added to queue", id = historyItem.Id });
         }
@@ -448,7 +435,7 @@ public class ClientController : ControllerBase
 }
 
 /// <summary>
-/// Represents a client transfer request.
+/// Represents a request to transfer a file from a client to a server.
 /// </summary>
 public class ClientTransferRequest
 {
@@ -458,7 +445,7 @@ public class ClientTransferRequest
     public IFormFile? File { get; set; }
     
     /// <summary>
-    /// Gets or sets the name of the file.
+    /// Gets or sets the filename to use for the transferred file.
     /// </summary>
     public string? FileName { get; set; }
     
@@ -488,7 +475,7 @@ public class ClientTransferRequest
     public bool UseEncryption { get; set; }
     
     /// <summary>
-    /// Gets or sets the password for encryption.
+    /// Gets or sets the password to use for encryption.
     /// </summary>
     public string? Password { get; set; }
     
@@ -496,6 +483,14 @@ public class ClientTransferRequest
     /// Gets or sets a value indicating whether to enable resume capability.
     /// </summary>
     public bool ResumeEnabled { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the speed limit for the transfer in KB/s.
+    /// </summary>
+    /// <remarks>
+    /// A value of null or 0 means no limit.
+    /// </remarks>
+    public int? SpeedLimit { get; set; }
 }
 
 /// <summary>
@@ -530,7 +525,7 @@ public enum TransferStatus
 }
 
 /// <summary>
-/// Represents a transfer history item.
+/// Represents a file transfer history item.
 /// </summary>
 public class TransferHistoryItem
 {
@@ -540,7 +535,7 @@ public class TransferHistoryItem
     public string Id { get; set; } = string.Empty;
     
     /// <summary>
-    /// Gets or sets the name of the file.
+    /// Gets or sets the name of the file being transferred.
     /// </summary>
     public string FileName { get; set; } = string.Empty;
     
@@ -560,12 +555,12 @@ public class TransferHistoryItem
     public long Size { get; set; }
     
     /// <summary>
-    /// Gets or sets the date and time when the transfer started.
+    /// Gets or sets the time when the transfer started.
     /// </summary>
     public DateTime StartTime { get; set; }
     
     /// <summary>
-    /// Gets or sets the date and time when the transfer ended.
+    /// Gets or sets the time when the transfer ended.
     /// </summary>
     public DateTime? EndTime { get; set; }
     
@@ -588,4 +583,9 @@ public class TransferHistoryItem
     /// Gets or sets a value indicating whether encryption was used.
     /// </summary>
     public bool UseEncryption { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the speed limit for the transfer in KB/s.
+    /// </summary>
+    public int? SpeedLimit { get; set; }
 } 

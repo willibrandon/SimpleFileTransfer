@@ -53,4 +53,12 @@ public class FileTransferOptions
     /// It can be null when encryption is not used.
     /// </remarks>
     public string? Password { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the speed limit for the transfer in KB/s.
+    /// </summary>
+    /// <remarks>
+    /// A value of null or 0 means no limit.
+    /// </remarks>
+    public int? SpeedLimit { get; set; }
 }

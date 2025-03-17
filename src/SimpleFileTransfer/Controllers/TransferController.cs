@@ -54,7 +54,8 @@ public class TransferController(IFileTransferService fileTransferService) : Cont
                 DestinationPath = request.DestinationPath,
                 Compress = request.Compress,
                 Encrypt = request.Encrypt,
-                Password = request.Password
+                Password = request.Password,
+                SpeedLimit = request.SpeedLimit
             };
 
             await _fileTransferService.TransferFileAsync(options);

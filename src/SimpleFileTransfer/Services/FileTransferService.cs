@@ -50,6 +50,12 @@ public class FileTransferService : IFileTransferService
         // Create a new FileTransfer instance
         FileTransfer transfer = new BasicFileTransfer();
 
+        // Apply speed limit if specified
+        if (options.SpeedLimit.HasValue && options.SpeedLimit.Value > 0)
+        {
+            transfer = new ThrottledFileTransfer(transfer, options.SpeedLimit.Value);
+        }
+
         if (options.Compress)
         {
             transfer = new CompressedFileTransfer(transfer);
