@@ -149,13 +149,26 @@ export const clientApi = {
   // Add a transfer to the queue
   queueTransfer: async (transferRequest) => {
     try {
+      // Check if transferRequest is already FormData
+      const formData = transferRequest instanceof FormData 
+        ? transferRequest 
+        : new FormData();
+      
+      // If it's not already FormData, add all properties to the FormData object
+      if (!(transferRequest instanceof FormData)) {
+        Object.entries(transferRequest).forEach(([key, value]) => {
+          // Skip null or undefined values
+          if (value != null) {
+            formData.append(key, value);
+          }
+        });
+      }
+      
       const response = await fetch(`${API_BASE_URL}/client/queue`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(transferRequest),
+        body: formData, // No Content-Type header - browser will set it with boundary
       });
+      
       return await response.json();
     } catch (error) {
       console.error('Error queuing transfer:', error);
@@ -236,6 +249,23 @@ export const clientApi = {
       try {
         const data = JSON.parse(responseText);
         console.log('Parsed history API response:', data);
+        
+        // Process the items to ensure speed limit is preserved
+        if (data.items && Array.isArray(data.items)) {
+          data.items = data.items.map(item => {
+            // Ensure speedLimit is preserved in both camelCase and PascalCase
+            const speedLimit = item.speedLimit || item.SpeedLimit;
+            if (speedLimit) {
+              return {
+                ...item,
+                speedLimit: speedLimit,
+                SpeedLimit: speedLimit
+              };
+            }
+            return item;
+          });
+        }
+        
         return data;
       } catch (parseError) {
         console.error('Failed to parse history API response:', parseError);

@@ -40,10 +40,32 @@ export function ClientView() {
         return;
       }
       
+      // Process history items to ensure consistent property names
+      const processedItems = historyItems.map(item => {
+        // Ensure speedLimit is preserved in both camelCase and PascalCase
+        const speedLimit = item.speedLimit || item.SpeedLimit;
+        
+        return {
+          ...item,
+          // Normalize property names to ensure consistency
+          id: item.id || item.Id,
+          fileName: item.fileName || item.FileName,
+          host: item.host || item.Host || item.targetHost || item.TargetHost,
+          port: item.port || item.Port,
+          size: item.size || item.Size,
+          startTime: item.startTime || item.StartTime,
+          endTime: item.endTime || item.EndTime,
+          status: item.status || item.Status,
+          // Ensure speedLimit is preserved
+          speedLimit: speedLimit,
+          SpeedLimit: speedLimit
+        };
+      });
+      
       // Sort history by startTime in descending order (newest first)
-      const sortedHistory = [...historyItems].sort((a, b) => {
-        const dateA = new Date(a.startTime || a.StartTime || 0);
-        const dateB = new Date(b.startTime || b.StartTime || 0);
+      const sortedHistory = [...processedItems].sort((a, b) => {
+        const dateA = new Date(a.startTime || 0);
+        const dateB = new Date(b.startTime || 0);
         return dateB - dateA; // Descending order
       });
       
@@ -78,7 +100,24 @@ export function ClientView() {
         // Add or update transfers from WebSocket
         wsTransferHistory.forEach(item => {
           if (item && (item.id || item.Id)) {
-            historyMap.set(item.id || item.Id, item);
+            const id = item.id || item.Id;
+            const existingItem = historyMap.get(id);
+            
+            if (existingItem) {
+              // Preserve important properties like speedLimit when updating
+              const speedLimit = item.speedLimit || item.SpeedLimit || 
+                                existingItem.speedLimit || existingItem.SpeedLimit;
+              
+              historyMap.set(id, {
+                ...existingItem,
+                ...item,
+                // Explicitly preserve these properties
+                speedLimit: speedLimit,
+                SpeedLimit: speedLimit
+              });
+            } else {
+              historyMap.set(id, item);
+            }
           }
         });
         

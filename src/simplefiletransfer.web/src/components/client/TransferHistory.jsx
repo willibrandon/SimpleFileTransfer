@@ -14,8 +14,36 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
   // Process transfers prop
   useEffect(() => {
     if (Array.isArray(transfers) && transfers.length > 0) {
+      // Create a map of existing history items to preserve their properties
+      const existingHistoryMap = new Map(
+        history.map(item => [
+          item.id || item.Id, 
+          { 
+            speedLimit: item.speedLimit || item.SpeedLimit,
+            SpeedLimit: item.speedLimit || item.SpeedLimit
+          }
+        ])
+      );
+      
+      // Process the transfers to ensure consistent property names and preserve speed limit
+      const processedTransfers = transfers.map(item => {
+        const id = item.id || item.Id;
+        const existingData = existingHistoryMap.get(id);
+        
+        // Get the speed limit from either the new item or the existing one
+        const speedLimit = item.speedLimit || item.SpeedLimit || 
+                          (existingData ? existingData.speedLimit : null);
+        
+        return {
+          ...item,
+          // Ensure speedLimit is preserved
+          speedLimit: speedLimit,
+          SpeedLimit: speedLimit
+        };
+      });
+      
       // Sort transfers by startTime in descending order (newest first)
-      const sortedTransfers = [...transfers].sort((a, b) => {
+      const sortedTransfers = [...processedTransfers].sort((a, b) => {
         const dateA = new Date(a.startTime || a.StartTime || 0);
         const dateB = new Date(b.startTime || b.StartTime || 0);
         return dateB - dateA; // Descending order
@@ -92,7 +120,8 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
         port: transfer.port || transfer.Port,
         useCompression: transfer.useCompression || transfer.UseCompression,
         useEncryption: transfer.useEncryption || transfer.UseEncryption,
-        password: transfer.password || transfer.Password
+        password: transfer.password || transfer.Password,
+        speedLimit: transfer.speedLimit || transfer.SpeedLimit
       };
       
       // Queue the transfer
@@ -115,7 +144,39 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
   // Manually trigger a history refresh
   const handleRefresh = () => {
     if (refreshHistory) {
+      // Save the current history items with their speed limits before refreshing
+      const currentHistoryMap = new Map(
+        history.map(item => [
+          item.id || item.Id, 
+          { 
+            speedLimit: item.speedLimit || item.SpeedLimit,
+            SpeedLimit: item.speedLimit || item.SpeedLimit
+          }
+        ])
+      );
+      
+      // Call the refresh function
       refreshHistory();
+      
+      // After a short delay, update the history items with the saved speed limits
+      setTimeout(() => {
+        setHistory(prevHistory => {
+          return prevHistory.map(item => {
+            const id = item.id || item.Id;
+            const savedData = currentHistoryMap.get(id);
+            
+            if (savedData && (savedData.speedLimit || savedData.SpeedLimit)) {
+              return {
+                ...item,
+                speedLimit: savedData.speedLimit,
+                SpeedLimit: savedData.SpeedLimit
+              };
+            }
+            
+            return item;
+          });
+        });
+      }, 1000); // Wait for the refresh to complete
     }
   };
 
@@ -277,6 +338,7 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
               const statusLower = String(status).toLowerCase();
               const startTime = formatDate(transfer.startTime || transfer.StartTime);
               const endTime = formatDate(transfer.endTime || transfer.EndTime);
+              const speedLimit = transfer.speedLimit || transfer.SpeedLimit;
               
               let statusClass = '';
               if (statusLower.includes('complet')) statusClass = 'status-completed';
@@ -315,6 +377,13 @@ export function TransferHistory({ transfers = [], isLoading = false, error = '',
                       <span className="detail-label">Completed: </span>
                       <span className="detail-value">{endTime}</span>
                     </div>
+                    
+                    {speedLimit && (
+                      <div style={{ whiteSpace: 'nowrap' }}>
+                        <span className="detail-label">Speed Limit: </span>
+                        <span className="detail-value">{speedLimit} KB/s</span>
+                      </div>
+                    )}
                   </div>
                   
                   {statusLower.includes('fail') && (

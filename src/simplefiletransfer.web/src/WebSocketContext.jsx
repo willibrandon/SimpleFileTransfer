@@ -361,7 +361,14 @@ export function WebSocketProvider({ children }) {
       case 'transfer_started':
       case 'transfer_completed':
       case 'transfer_failed':
-        updateTransferHistory(event.data);
+        // Ensure we preserve the speedLimit property
+        const transferData = {
+          ...event.data,
+          // Make sure speedLimit is preserved in both camelCase and PascalCase
+          speedLimit: event.data.speedLimit || event.data.SpeedLimit,
+          SpeedLimit: event.data.speedLimit || event.data.SpeedLimit
+        };
+        updateTransferHistory(transferData);
         break;
         
       case 'transfer_queued':
@@ -406,9 +413,21 @@ export function WebSocketProvider({ children }) {
       const index = prev.findIndex(item => item.id === transfer.id);
       
       if (index >= 0) {
-        // Update existing transfer
+        // Update existing transfer but preserve important properties that might not be in the update
+        const existingTransfer = prev[index];
         const updated = [...prev];
-        updated[index] = { ...updated[index], ...transfer };
+        
+        // Preserve speedLimit if it exists in the original but not in the update
+        const speedLimit = transfer.speedLimit || transfer.SpeedLimit || existingTransfer.speedLimit || existingTransfer.SpeedLimit;
+        
+        updated[index] = { 
+          ...existingTransfer, 
+          ...transfer,
+          // Explicitly preserve these properties if they're not in the update
+          speedLimit: speedLimit,
+          SpeedLimit: speedLimit // Include both casing variants for compatibility
+        };
+        
         return updated;
       } else {
         // Add new transfer

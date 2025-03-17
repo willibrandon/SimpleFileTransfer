@@ -10,7 +10,8 @@ export function FileTransferForm({ onTransferComplete }) {
     useEncryption: false,
     password: '',
     resumeEnabled: true,
-    addToQueue: false
+    addToQueue: false,
+    speedLimit: ''
   })
   
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -80,6 +81,11 @@ export function FileTransferForm({ onTransferComplete }) {
       formDataToSend.append('password', formData.password)
       formDataToSend.append('resumeEnabled', formData.resumeEnabled)
       formDataToSend.append('addToQueue', formData.addToQueue)
+      
+      // Add speed limit if provided
+      if (formData.speedLimit) {
+        formDataToSend.append('speedLimit', formData.speedLimit)
+      }
       
       // Determine the endpoint based on whether we're adding to queue or sending directly
       const endpoint = formData.addToQueue ? '/api/client/queue' : '/api/client/send'
@@ -270,6 +276,21 @@ export function FileTransferForm({ onTransferComplete }) {
             />
           </div>
         )}
+        
+        <div className="form-group">
+          <label htmlFor="speedLimit">Speed Limit (KB/s)</label>
+          <input
+            type="number"
+            id="speedLimit"
+            name="speedLimit"
+            value={formData.speedLimit}
+            onChange={handleChange}
+            placeholder="No limit"
+            min="1"
+            disabled={isSubmitting}
+          />
+          <small>Leave empty for no limit</small>
+        </div>
         
         <button
           type="submit"
