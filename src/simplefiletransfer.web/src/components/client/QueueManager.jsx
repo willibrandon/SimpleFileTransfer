@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { clientApi } from '../../api/apiService';
 import { useWebSocket } from '../../WebSocketContext'
 
-export function QueueManager({ isProcessing: initialIsProcessing, count, onProcessingChange }) {
+export function QueueManager({ isProcessing: initialIsProcessing, count, onProcessingChange, onQueueOperation }) {
   const { connected } = useWebSocket()
   const [queue, setQueue] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(initialIsProcessing);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusType, setStatusType] = useState(''); // 'success', 'error'
 
   // Update parent component when processing state changes
   useEffect(() => {
@@ -42,6 +44,17 @@ export function QueueManager({ isProcessing: initialIsProcessing, count, onProce
     setIsProcessing(initialIsProcessing);
   }, [initialIsProcessing]);
 
+  const showStatus = (message, type) => {
+    setStatusMessage(message);
+    setStatusType(type);
+    
+    // Clear status after 5 seconds
+    setTimeout(() => {
+      setStatusMessage('');
+      setStatusType('');
+    }, 5000);
+  };
+
   // Handle starting the queue
   const handleStartQueue = async () => {
     try {
@@ -50,12 +63,22 @@ export function QueueManager({ isProcessing: initialIsProcessing, count, onProce
       })
       
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to start queue')
+        throw new Error('Failed to start queue')
+      }
+      
+      setIsProcessing(true)
+      showStatus('Queue processing started', 'success')
+      
+      // Refresh transfer history after starting the queue
+      if (onQueueOperation) {
+        setTimeout(() => {
+          onQueueOperation();
+        }, 500);
       }
     } catch (error) {
       console.error('Error starting queue:', error)
-      alert(`Error starting queue: ${error.message}`)
+      setError('Failed to start queue')
+      showStatus('Failed to start queue', 'error')
     }
   }
   
@@ -67,33 +90,49 @@ export function QueueManager({ isProcessing: initialIsProcessing, count, onProce
       })
       
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to stop queue')
+        throw new Error('Failed to stop queue')
+      }
+      
+      setIsProcessing(false)
+      showStatus('Queue processing stopped', 'success')
+      
+      // Refresh transfer history after stopping the queue
+      if (onQueueOperation) {
+        setTimeout(() => {
+          onQueueOperation();
+        }, 500);
       }
     } catch (error) {
       console.error('Error stopping queue:', error)
-      alert(`Error stopping queue: ${error.message}`)
+      setError('Failed to stop queue')
+      showStatus('Failed to stop queue', 'error')
     }
   }
   
   // Handle clearing the queue
   const handleClearQueue = async () => {
-    if (!confirm('Are you sure you want to clear the queue? This will cancel all pending transfers.')) {
-      return
-    }
-    
     try {
       const response = await fetch('/api/client/queue/clear', {
         method: 'POST'
       })
       
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to clear queue')
+        throw new Error('Failed to clear queue')
+      }
+      
+      setQueue([])
+      showStatus('Queue cleared successfully', 'success')
+      
+      // Refresh transfer history after clearing the queue
+      if (onQueueOperation) {
+        setTimeout(() => {
+          onQueueOperation();
+        }, 500);
       }
     } catch (error) {
       console.error('Error clearing queue:', error)
-      alert(`Error clearing queue: ${error.message}`)
+      setError('Failed to clear queue')
+      showStatus('Failed to clear queue', 'error')
     }
   }
 
@@ -104,6 +143,8 @@ export function QueueManager({ isProcessing: initialIsProcessing, count, onProce
   return (
     <div className="queue-manager">
       <h2>Queue Manager</h2>
+      
+      {statusMessage && <div className={`status ${statusType}`}>{statusMessage}</div>}
       
       <div className="queue-status">
         <div>

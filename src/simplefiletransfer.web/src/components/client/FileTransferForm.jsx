@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useWebSocket } from '../../WebSocketContext'
 
-export function FileTransferForm() {
+export function FileTransferForm({ onTransferComplete }) {
   const [formData, setFormData] = useState({
     host: '',
     port: 9876,
@@ -14,6 +14,8 @@ export function FileTransferForm() {
   })
   
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [statusMessage, setStatusMessage] = useState('')
+  const [statusType, setStatusType] = useState('') // 'success', 'error'
   const { connected } = useWebSocket()
   
   const handleChange = (e) => {
@@ -37,53 +39,59 @@ export function FileTransferForm() {
     }
   }
   
+  const showStatus = (message, type) => {
+    setStatusMessage(message)
+    setStatusType(type)
+    
+    // Clear status after 5 seconds
+    setTimeout(() => {
+      setStatusMessage('')
+      setStatusType('')
+    }, 5000)
+  }
+  
   const handleSubmit = async (e) => {
     e.preventDefault()
     
     if (!formData.host) {
-      alert('Please enter a host address')
+      showStatus('Please enter a host address', 'error')
       return
     }
     
     if (!formData.file) {
-      alert('Please select a file to transfer')
+      showStatus('Please select a file to transfer', 'error')
       return
     }
     
     if (formData.useEncryption && !formData.password) {
-      alert('Please enter a password for encryption')
+      showStatus('Please enter a password for encryption', 'error')
       return
     }
     
+    setIsSubmitting(true)
+    
     try {
-      setIsSubmitting(true)
+      const formDataToSend = new FormData()
+      formDataToSend.append('host', formData.host)
+      formDataToSend.append('port', formData.port)
+      formDataToSend.append('file', formData.file)
+      formDataToSend.append('useCompression', formData.useCompression)
+      formDataToSend.append('useEncryption', formData.useEncryption)
+      formDataToSend.append('password', formData.password)
+      formDataToSend.append('resumeEnabled', formData.resumeEnabled)
+      formDataToSend.append('addToQueue', formData.addToQueue)
       
-      // Create form data for the API request
-      const apiFormData = new FormData()
-      apiFormData.append('file', formData.file)
-      apiFormData.append('host', formData.host)
-      apiFormData.append('port', formData.port)
-      apiFormData.append('useCompression', formData.useCompression)
-      apiFormData.append('useEncryption', formData.useEncryption)
-      
-      if (formData.useEncryption) {
-        apiFormData.append('password', formData.password)
-      }
-      
-      apiFormData.append('resumeEnabled', formData.resumeEnabled)
-      
-      // Determine the endpoint based on whether to add to queue
+      // Determine the endpoint based on whether we're adding to queue or sending directly
       const endpoint = formData.addToQueue ? '/api/client/queue' : '/api/client/send'
       
-      // Send the request
       const response = await fetch(endpoint, {
         method: 'POST',
-        body: apiFormData
+        body: formDataToSend
       })
       
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to transfer file')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to transfer file')
       }
       
       // Reset the file input
@@ -99,10 +107,18 @@ export function FileTransferForm() {
       }
       
       // Show success message
-      alert(formData.addToQueue ? 'File added to queue' : 'File transfer started')
+      showStatus(formData.addToQueue ? 'File added to queue' : 'File transfer started', 'success')
+      
+      // Call the onTransferComplete callback to refresh the transfer history
+      if (onTransferComplete) {
+        // Add a small delay to allow the server to process the request
+        setTimeout(() => {
+          onTransferComplete();
+        }, 500);
+      }
     } catch (error) {
       console.error('Error transferring file:', error)
-      alert(`Error: ${error.message}`)
+      showStatus(`Error: ${error.message}`, 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -111,6 +127,12 @@ export function FileTransferForm() {
   return (
     <div className="file-transfer-form">
       <h2>Send File</h2>
+      
+      {statusMessage && (
+        <div className={`status ${statusType}`}>
+          {statusMessage}
+        </div>
+      )}
       
       <form onSubmit={handleSubmit}>
         <div className="form-group">

@@ -392,7 +392,23 @@ public class ClientController : ControllerBase
     [HttpGet("history")]
     public IActionResult GetHistory()
     {
-        return Ok(new { history = _history });
+        // Create a copy of the history list to avoid modification during serialization
+        var historyItems = _history.Select(item => new
+        {
+            Id = item.Id,
+            FileName = item.FileName,
+            Host = item.Host,
+            Port = item.Port,
+            Size = item.Size,
+            StartTime = item.StartTime,
+            EndTime = item.EndTime,
+            Status = item.Status.ToString(), // Convert enum to string for consistent serialization
+            Error = item.Error,
+            UseCompression = item.UseCompression,
+            UseEncryption = item.UseEncryption
+        }).ToList();
+
+        return Ok(new { items = historyItems });
     }
     
     private static async void OnTransferCompleted(object? sender, TransferCompletedEventArgs e)
