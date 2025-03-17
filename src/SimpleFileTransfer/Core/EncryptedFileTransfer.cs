@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using SimpleFileTransfer.Helpers;
 
 namespace SimpleFileTransfer.Core;
 
@@ -9,8 +10,6 @@ namespace SimpleFileTransfer.Core;
 /// <remarks>
 /// This class implements the decorator pattern to add encryption behavior to any <see cref="FileTransfer"/> instance.
 /// It encrypts the source file before transferring it to the destination.
-/// In a real implementation, this would use an encryption library, but for simplicity,
-/// this implementation just copies the file.
 /// </remarks>
 /// <remarks>
 /// Initializes a new instance of the <see cref="EncryptedFileTransfer"/> class.
@@ -53,9 +52,8 @@ public class EncryptedFileTransfer(FileTransfer decoratedTransfer, string passwo
             using (var sourceStream = File.OpenRead(sourcePath))
             using (var tempStream = File.Create(tempFile))
             {
-                // In a real implementation, we would use an encryption library here
-                // For simplicity, we're just copying the file
-                sourceStream.CopyTo(tempStream);
+                // Use the EncryptionHelper to encrypt the file with the password
+                EncryptionHelper.Encrypt(sourceStream, tempStream, _password);
             }
 
             // Transfer the encrypted file to the destination
