@@ -23,6 +23,21 @@ public class FileTransferServer
     private readonly CancellationToken _cancellationToken;
 
     /// <summary>
+    /// Event that is raised when a file is received.
+    /// </summary>
+    public event EventHandler<FileReceivedEventArgs>? FileReceived;
+
+    /// <summary>
+    /// Gets a value indicating whether any server instance is currently running.
+    /// </summary>
+    public static bool IsRunning { get; private set; }
+
+    /// <summary>
+    /// Gets the port number of the currently running server, or 0 if no server is running.
+    /// </summary>
+    public static int CurrentPort { get; private set; }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="FileTransferServer"/> class.
     /// </summary>
     /// <param name="downloadsDirectory">The directory where received files will be saved.</param>
@@ -53,6 +68,9 @@ public class FileTransferServer
         }
 
         _isRunning = true;
+        IsRunning = true;
+        CurrentPort = _port;
+        
         _listener = new TcpListener(IPAddress.Any, _port);
         _listener.Start();
         
@@ -81,6 +99,9 @@ public class FileTransferServer
     public void Stop()
     {
         _isRunning = false;
+        IsRunning = false;
+        CurrentPort = 0;
+        
         _listener?.Stop();
         Console.WriteLine("Server stopped");
     }
@@ -132,16 +153,16 @@ public class FileTransferServer
                 
                 if (firstString.StartsWith("DIR:"))
                 {
-                    ReceiveDirectory(reader, stream);
+                    ReceiveDirectory(reader, stream, client);
                 }
                 else if (firstString.StartsWith("MULTI:"))
                 {
-                    ReceiveMultipleFiles(reader, stream);
+                    ReceiveMultipleFiles(reader, stream, client);
                 }
                 else
                 {
                     // It's a single file transfer, firstString is the filename
-                    ReceiveFile(reader, stream, firstString);
+                    ReceiveFile(reader, stream, firstString, client);
                 }
             }
         }
@@ -156,7 +177,8 @@ public class FileTransferServer
     /// </summary>
     /// <param name="reader">The binary reader for reading from the network stream.</param>
     /// <param name="stream">The network stream connected to the client.</param>
-    private void ReceiveDirectory(BinaryReader reader, NetworkStream stream)
+    /// <param name="client">The TcpClient connected to the sender.</param>
+    private void ReceiveDirectory(BinaryReader reader, NetworkStream stream, TcpClient client)
     {
         // Read compression flag
         var useCompression = reader.ReadBoolean();
@@ -402,6 +424,10 @@ public class FileTransferServer
                 Console.WriteLine("Expected: " + sourceHash);
                 Console.WriteLine("Calculated: " + calculatedHash);
             }
+            
+            // Raise the FileReceived event
+            var senderIp = client?.Client?.RemoteEndPoint?.ToString();
+            OnFileReceived(savePath, originalSize, senderIp);
         }
         
         Console.WriteLine("\nDirectory received successfully");
@@ -413,7 +439,8 @@ public class FileTransferServer
     /// <param name="reader">The binary reader for reading from the network stream.</param>
     /// <param name="stream">The network stream connected to the client.</param>
     /// <param name="filename">The name of the file being received.</param>
-    private void ReceiveFile(BinaryReader reader, NetworkStream stream, string filename)
+    /// <param name="client">The TcpClient connected to the sender.</param>
+    private void ReceiveFile(BinaryReader reader, NetworkStream stream, string filename, TcpClient client)
     {
         // Read compression flag
         var useCompression = reader.ReadBoolean();
@@ -648,6 +675,10 @@ public class FileTransferServer
             Console.WriteLine("Expected: " + sourceHash);
             Console.WriteLine("Calculated: " + calculatedHash);
         }
+        
+        // Raise the FileReceived event
+        var senderIp = client?.Client?.RemoteEndPoint?.ToString();
+        OnFileReceived(savePath, originalSize, senderIp);
     }
 
     /// <summary>
@@ -655,7 +686,8 @@ public class FileTransferServer
     /// </summary>
     /// <param name="reader">The binary reader for reading from the network stream.</param>
     /// <param name="stream">The network stream connected to the client.</param>
-    private void ReceiveMultipleFiles(BinaryReader reader, NetworkStream stream)
+    /// <param name="client">The TcpClient connected to the sender.</param>
+    private void ReceiveMultipleFiles(BinaryReader reader, NetworkStream stream, TcpClient client)
     {
         // Read compression flag
         var useCompression = reader.ReadBoolean();
@@ -890,8 +922,23 @@ public class FileTransferServer
                 Console.WriteLine("Expected: " + sourceHash);
                 Console.WriteLine("Calculated: " + calculatedHash);
             }
+            
+            // Raise the FileReceived event
+            var senderIp = client?.Client?.RemoteEndPoint?.ToString();
+            OnFileReceived(savePath, originalSize, senderIp);
         }
         
         Console.WriteLine("\nAll files received successfully");
+    }
+
+    /// <summary>
+    /// Raises the FileReceived event.
+    /// </summary>
+    /// <param name="filePath">The path to the received file.</param>
+    /// <param name="originalSize">The original size of the file in bytes.</param>
+    /// <param name="senderIp">The IP address of the sender.</param>
+    protected virtual void OnFileReceived(string filePath, long originalSize, string? senderIp)
+    {
+        FileReceived?.Invoke(this, new FileReceivedEventArgs(filePath, originalSize, senderIp));
     }
 }

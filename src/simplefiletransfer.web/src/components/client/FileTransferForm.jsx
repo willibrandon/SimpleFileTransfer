@@ -1,146 +1,232 @@
-import { useState } from 'react';
-import { clientApi } from '../../api/apiService';
+import { useState } from 'react'
+import { useWebSocket } from '../../WebSocketContext'
 
 export function FileTransferForm() {
-  const [sourceFile, setSourceFile] = useState('');
-  const [destinationFile, setDestinationFile] = useState('');
-  const [isCompressed, setIsCompressed] = useState(false);
-  const [isEncrypted, setIsEncrypted] = useState(false);
-  const [password, setPassword] = useState('');
-  const [transferStatus, setTransferStatus] = useState('');
-  const [isTransferring, setIsTransferring] = useState(false);
-  const [addToQueue, setAddToQueue] = useState(false);
-
-  const handleTransfer = async () => {
-    if (!sourceFile || !destinationFile) {
-      setTransferStatus('Please provide both source and destination paths');
-      return;
+  const [formData, setFormData] = useState({
+    host: '',
+    port: 9876,
+    file: null,
+    useCompression: false,
+    useEncryption: false,
+    password: '',
+    resumeEnabled: true,
+    addToQueue: false
+  })
+  
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { connected } = useWebSocket()
+  
+  const handleChange = (e) => {
+    const { name, value, type, checked, files } = e.target
+    
+    if (type === 'file') {
+      setFormData(prev => ({
+        ...prev,
+        file: files[0] || null
+      }))
+    } else if (type === 'checkbox') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: checked
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }))
     }
-
-    if (isEncrypted && !password) {
-      setTransferStatus('Password is required for encryption');
-      return;
+  }
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    if (!formData.host) {
+      alert('Please enter a host address')
+      return
     }
-
-    setIsTransferring(true);
-    setTransferStatus('Preparing transfer...');
-
-    const transferRequest = {
-      sourcePath: sourceFile,
-      destinationPath: destinationFile,
-      compress: isCompressed,
-      encrypt: isEncrypted,
-      password: isEncrypted ? password : undefined
-    };
-
+    
+    if (!formData.file) {
+      alert('Please select a file to transfer')
+      return
+    }
+    
+    if (formData.useEncryption && !formData.password) {
+      alert('Please enter a password for encryption')
+      return
+    }
+    
     try {
-      let response;
+      setIsSubmitting(true)
       
-      if (addToQueue) {
-        setTransferStatus('Adding to queue...');
-        response = await clientApi.queueTransfer(transferRequest);
-        setTransferStatus(`Added to queue successfully! ${response.message || ''}`);
-      } else {
-        setTransferStatus('Transferring file...');
-        response = await clientApi.sendFile(transferRequest);
-        setTransferStatus(`Transfer completed successfully! ${response.message || ''}`);
+      // Create form data for the API request
+      const apiFormData = new FormData()
+      apiFormData.append('file', formData.file)
+      apiFormData.append('host', formData.host)
+      apiFormData.append('port', formData.port)
+      apiFormData.append('useCompression', formData.useCompression)
+      apiFormData.append('useEncryption', formData.useEncryption)
+      
+      if (formData.useEncryption) {
+        apiFormData.append('password', formData.password)
       }
+      
+      apiFormData.append('resumeEnabled', formData.resumeEnabled)
+      
+      // Determine the endpoint based on whether to add to queue
+      const endpoint = formData.addToQueue ? '/api/client/queue' : '/api/client/send'
+      
+      // Send the request
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        body: apiFormData
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to transfer file')
+      }
+      
+      // Reset the file input
+      setFormData(prev => ({
+        ...prev,
+        file: null
+      }))
+      
+      // Reset the file input element
+      const fileInput = document.getElementById('file')
+      if (fileInput) {
+        fileInput.value = ''
+      }
+      
+      // Show success message
+      alert(formData.addToQueue ? 'File added to queue' : 'File transfer started')
     } catch (error) {
-      setTransferStatus(`Error: ${error.message || 'Failed to connect to server'}`);
+      console.error('Error transferring file:', error)
+      alert(`Error: ${error.message}`)
     } finally {
-      setIsTransferring(false);
+      setIsSubmitting(false)
     }
-  };
-
+  }
+  
   return (
     <div className="file-transfer-form">
       <h2>Send File</h2>
       
-      <div className="form-group">
-        <label htmlFor="sourceFile">Source File Path:</label>
-        <input
-          type="text"
-          id="sourceFile"
-          value={sourceFile}
-          onChange={(e) => setSourceFile(e.target.value)}
-          placeholder="C:\path\to\source\file.txt"
-          disabled={isTransferring}
-        />
-      </div>
-
-      <div className="form-group">
-        <label htmlFor="destinationFile">Destination File Path:</label>
-        <input
-          type="text"
-          id="destinationFile"
-          value={destinationFile}
-          onChange={(e) => setDestinationFile(e.target.value)}
-          placeholder="C:\path\to\destination\file.txt"
-          disabled={isTransferring}
-        />
-      </div>
-
-      <div className="options">
-        <div className="checkbox-group">
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="host">Server Address</label>
           <input
-            type="checkbox"
-            id="compress"
-            checked={isCompressed}
-            onChange={() => setIsCompressed(!isCompressed)}
-            disabled={isTransferring}
+            type="text"
+            id="host"
+            name="host"
+            value={formData.host}
+            onChange={handleChange}
+            placeholder="IP address or hostname"
+            required
+            disabled={isSubmitting}
           />
-          <label htmlFor="compress">Compress</label>
-        </div>
-
-        <div className="checkbox-group">
-          <input
-            type="checkbox"
-            id="encrypt"
-            checked={isEncrypted}
-            onChange={() => setIsEncrypted(!isEncrypted)}
-            disabled={isTransferring}
-          />
-          <label htmlFor="encrypt">Encrypt</label>
         </div>
         
-        <div className="checkbox-group">
-          <input
-            type="checkbox"
-            id="addToQueue"
-            checked={addToQueue}
-            onChange={() => setAddToQueue(!addToQueue)}
-            disabled={isTransferring}
-          />
-          <label htmlFor="addToQueue">Add to Queue</label>
-        </div>
-      </div>
-
-      {isEncrypted && (
         <div className="form-group">
-          <label htmlFor="password">Password:</label>
+          <label htmlFor="port">Port</label>
           <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isTransferring}
+            type="number"
+            id="port"
+            name="port"
+            value={formData.port}
+            onChange={handleChange}
+            min="1"
+            max="65535"
+            required
+            disabled={isSubmitting}
           />
         </div>
-      )}
-
-      <button 
-        className="transfer-button" 
-        onClick={handleTransfer}
-        disabled={isTransferring}
-      >
-        {isTransferring ? 'Processing...' : (addToQueue ? 'Add to Queue' : 'Transfer File')}
-      </button>
-
-      {transferStatus && (
-        <div className={`status ${transferStatus.includes('Error') ? 'error' : transferStatus.includes('successfully') ? 'success' : ''}`}>
-          {transferStatus}
+        
+        <div className="form-group">
+          <label htmlFor="file">File to Send</label>
+          <input
+            type="file"
+            id="file"
+            name="file"
+            onChange={handleChange}
+            required
+            disabled={isSubmitting}
+          />
         </div>
-      )}
+        
+        <div className="options">
+          <div className="checkbox-group">
+            <input
+              type="checkbox"
+              id="useCompression"
+              name="useCompression"
+              checked={formData.useCompression}
+              onChange={handleChange}
+              disabled={isSubmitting}
+            />
+            <label htmlFor="useCompression">Use Compression</label>
+          </div>
+          
+          <div className="checkbox-group">
+            <input
+              type="checkbox"
+              id="useEncryption"
+              name="useEncryption"
+              checked={formData.useEncryption}
+              onChange={handleChange}
+              disabled={isSubmitting}
+            />
+            <label htmlFor="useEncryption">Use Encryption</label>
+          </div>
+          
+          <div className="checkbox-group">
+            <input
+              type="checkbox"
+              id="resumeEnabled"
+              name="resumeEnabled"
+              checked={formData.resumeEnabled}
+              onChange={handleChange}
+              disabled={isSubmitting}
+            />
+            <label htmlFor="resumeEnabled">Enable Resume</label>
+          </div>
+          
+          <div className="checkbox-group">
+            <input
+              type="checkbox"
+              id="addToQueue"
+              name="addToQueue"
+              checked={formData.addToQueue}
+              onChange={handleChange}
+              disabled={isSubmitting}
+            />
+            <label htmlFor="addToQueue">Add to Queue</label>
+          </div>
+        </div>
+        
+        {formData.useEncryption && (
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required={formData.useEncryption}
+              disabled={isSubmitting}
+            />
+          </div>
+        )}
+        
+        <button
+          type="submit"
+          className="transfer-button"
+          disabled={isSubmitting || !connected}
+        >
+          {isSubmitting ? 'Processing...' : formData.addToQueue ? 'Add to Queue' : 'Transfer Now'}
+        </button>
+      </form>
     </div>
-  );
+  )
 } 

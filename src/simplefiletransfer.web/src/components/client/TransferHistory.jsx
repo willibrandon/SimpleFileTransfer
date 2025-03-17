@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { clientApi } from '../../api/apiService';
 
-export function TransferHistory() {
+export function TransferHistory({ transfers = [] }) {
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -36,8 +36,32 @@ export function TransferHistory() {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return '-';
     const date = new Date(dateString);
     return date.toLocaleString();
+  };
+
+  const getStatusClass = (status) => {
+    switch (status) {
+      case 'Completed':
+        return 'success';
+      case 'Failed':
+      case 'Cancelled':
+        return 'failed';
+      case 'InProgress':
+        return 'processing';
+      default:
+        return '';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'InProgress':
+        return 'In Progress';
+      default:
+        return status;
+    }
   };
 
   if (isLoading && !error) {
@@ -51,40 +75,42 @@ export function TransferHistory() {
       {error && <div className="error-message">{error}</div>}
       
       {history.length === 0 ? (
-        <p className="no-history">No transfer history available.</p>
+        <div className="no-history">No transfer history</div>
       ) : (
         <table className="history-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Source</th>
-              <th>Destination</th>
+              <th>File Name</th>
               <th>Size</th>
+              <th>Destination</th>
               <th>Status</th>
+              <th>Started</th>
+              <th>Completed</th>
               <th>Options</th>
             </tr>
           </thead>
           <tbody>
-            {history.map((item) => (
-              <tr key={item.id} className={item.status.toLowerCase()}>
-                <td>{formatDate(item.date)}</td>
-                <td>{item.type}</td>
-                <td>{item.source}</td>
-                <td>{item.destination}</td>
-                <td>{formatFileSize(item.size)}</td>
-                <td>{item.status}</td>
+            {history.map((transfer) => (
+              <tr key={transfer.id} className={getStatusClass(transfer.status)}>
+                <td>{transfer.fileName}</td>
+                <td>{formatFileSize(transfer.size)}</td>
+                <td>{transfer.host}:{transfer.port}</td>
+                <td>{getStatusText(transfer.status)}</td>
+                <td>{formatDate(transfer.startTime)}</td>
+                <td>{formatDate(transfer.endTime)}</td>
                 <td>
-                  {item.status === 'Failed' && (
-                    <button 
-                      className="retry-button"
-                      onClick={() => {
-                        // Implement retry functionality
-                        alert('Retry functionality not implemented yet');
-                      }}
-                    >
+                  {transfer.status === 'Failed' && (
+                    <button className="retry-button">
                       Retry
                     </button>
+                  )}
+                  {transfer.status === 'Failed' && transfer.error && (
+                    <span 
+                      className="error-info" 
+                      title={transfer.error}
+                    >
+                      ⓘ
+                    </span>
                   )}
                 </td>
               </tr>

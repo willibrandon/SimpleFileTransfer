@@ -14,6 +14,11 @@ public abstract class QueuedTransfer
     public abstract string Description { get; }
     
     /// <summary>
+    /// Gets or sets user-defined data associated with the transfer.
+    /// </summary>
+    public object? UserData { get; set; }
+    
+    /// <summary>
     /// Executes the transfer asynchronously.
     /// </summary>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>

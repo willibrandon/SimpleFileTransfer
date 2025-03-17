@@ -1,18 +1,25 @@
-import { ServerControlPanel } from './ServerControlPanel';
-import { ReceivedFilesList } from './ReceivedFilesList';
+import { useState, useEffect } from 'react'
+import { ServerControlPanel } from './ServerControlPanel'
+import { ReceivedFiles } from './ReceivedFiles'
+import { useWebSocket } from '../../WebSocketContext'
 
 export function ServerView() {
+  const { serverStatus, receivedFiles } = useWebSocket()
+  
   return (
     <div className="server-view">
-      <h1>File Transfer Server</h1>
+      <h1>Server Mode</h1>
       <p className="description">
-        Configure and manage your file transfer server. Start the server to receive files from clients.
+        Receive files from other devices. Start the server and share your IP address with others.
       </p>
       
       <div className="server-container">
-        <ServerControlPanel />
-        <ReceivedFilesList />
+        <ServerControlPanel 
+          isRunning={serverStatus.isRunning} 
+          port={serverStatus.port} 
+        />
+        <ReceivedFiles files={receivedFiles} />
       </div>
     </div>
-  );
+  )
 } 
