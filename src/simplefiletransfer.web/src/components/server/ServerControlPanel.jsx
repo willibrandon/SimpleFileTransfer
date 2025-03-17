@@ -1,5 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useWebSocket } from '../../WebSocketContext'
+
+// Define styles as a constant
+const styles = {
+  statusMessage: {
+    padding: '10px',
+    borderRadius: '4px',
+    marginBottom: '15px',
+    textAlign: 'center'
+  },
+  error: {
+    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+    color: '#e74c3c',
+    border: '1px solid rgba(231, 76, 60, 0.3)'
+  },
+  success: {
+    backgroundColor: 'rgba(46, 204, 113, 0.1)',
+    color: '#2ecc71',
+    border: '1px solid rgba(46, 204, 113, 0.3)'
+  },
+  info: {
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    color: '#3498db',
+    border: '1px solid rgba(52, 152, 219, 0.3)'
+  }
+};
 
 export function ServerControlPanel({ isRunning, port }) {
   const [config, setConfig] = useState({
@@ -8,11 +33,55 @@ export function ServerControlPanel({ isRunning, port }) {
     useEncryption: false,
     password: ''
   })
+  const [statusMessage, setStatusMessage] = useState({ type: '', message: '' })
+  const [localIsRunning, setLocalIsRunning] = useState(isRunning)
   
   const { connected } = useWebSocket()
   
+  // Update local state when props change
+  useEffect(() => {
+    setLocalIsRunning(isRunning);
+  }, [isRunning]);
+  
+  // Check server status before starting
+  const getServerStatus = async () => {
+    try {
+      const response = await fetch('/api/server/status');
+      if (response.ok) {
+        const data = await response.json();
+        setLocalIsRunning(data.isRunning);
+        return data.isRunning;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking server status:', error);
+      return false;
+    }
+  };
+  
+  // Clear status message after a delay
+  const clearStatusMessage = () => {
+    setTimeout(() => {
+      setStatusMessage({ type: '', message: '' });
+    }, 5000);
+  };
+  
   // Handle starting the server
   const handleStartServer = async () => {
+    // Clear any previous status messages
+    setStatusMessage({ type: '', message: '' });
+    
+    // Check if server is already running
+    const serverRunning = await getServerStatus();
+    if (serverRunning) {
+      setStatusMessage({ 
+        type: 'info', 
+        message: 'Server is already running' 
+      });
+      clearStatusMessage();
+      return;
+    }
+    
     try {
       const response = await fetch('/api/server/start', {
         method: 'POST',
@@ -23,34 +92,80 @@ export function ServerControlPanel({ isRunning, port }) {
       })
       
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to start server')
+        const errorData = await response.json()
+        
+        // Handle "Server is already running" error gracefully
+        if (errorData.error === "Server is already running") {
+          setStatusMessage({ 
+            type: 'info', 
+            message: 'Server is already running' 
+          });
+          setLocalIsRunning(true);
+          clearStatusMessage();
+          return;
+        }
+        
+        throw new Error(errorData.error || 'Failed to start server')
       }
+      
+      // Update local state
+      setLocalIsRunning(true);
+      
+      // Show success message
+      setStatusMessage({ 
+        type: 'success', 
+        message: 'Server started successfully' 
+      });
+      clearStatusMessage();
     } catch (error) {
-      console.error('Error starting server:', error)
-      alert(`Error starting server: ${error.message}`)
+      // Show error message without console logging
+      setStatusMessage({ 
+        type: 'error', 
+        message: `Error: ${error.message}` 
+      });
+      clearStatusMessage();
     }
   }
   
   // Handle stopping the server
   const handleStopServer = async () => {
+    // Clear any previous status messages
+    setStatusMessage({ type: '', message: '' });
+    
     try {
       const response = await fetch('/api/server/stop', {
         method: 'POST'
       })
       
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to stop server')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to stop server')
       }
+      
+      // Update local state
+      setLocalIsRunning(false);
+      
+      // Show success message
+      setStatusMessage({ 
+        type: 'success', 
+        message: 'Server stopped successfully' 
+      });
+      clearStatusMessage();
     } catch (error) {
-      console.error('Error stopping server:', error)
-      alert(`Error stopping server: ${error.message}`)
+      // Show error message without console logging
+      setStatusMessage({ 
+        type: 'error', 
+        message: `Error: ${error.message}` 
+      });
+      clearStatusMessage();
     }
   }
   
   // Handle saving server configuration
   const handleSaveConfig = async () => {
+    // Clear any previous status messages
+    setStatusMessage({ type: '', message: '' });
+    
     try {
       const response = await fetch('/api/server/config', {
         method: 'POST',
@@ -61,14 +176,23 @@ export function ServerControlPanel({ isRunning, port }) {
       })
       
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to save configuration')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save configuration')
       }
       
-      alert('Configuration saved successfully')
+      // Show success message
+      setStatusMessage({ 
+        type: 'success', 
+        message: 'Configuration saved successfully' 
+      });
+      clearStatusMessage();
     } catch (error) {
-      console.error('Error saving configuration:', error)
-      alert(`Error saving configuration: ${error.message}`)
+      // Show error message without console logging
+      setStatusMessage({ 
+        type: 'error', 
+        message: `Error: ${error.message}` 
+      });
+      clearStatusMessage();
     }
   }
   
@@ -81,19 +205,38 @@ export function ServerControlPanel({ isRunning, port }) {
     }))
   }
   
+  // Get combined style for status message
+  const getStatusMessageStyle = (type) => {
+    return {
+      ...styles.statusMessage,
+      ...(type === 'error' ? styles.error : 
+         type === 'success' ? styles.success : 
+         type === 'info' ? styles.info : {})
+    };
+  };
+  
+  // Use the local state for rendering
+  const displayIsRunning = localIsRunning;
+  
   return (
     <div className="server-control-panel">
       <h2>Server Control</h2>
       
+      {statusMessage.message && (
+        <div style={getStatusMessageStyle(statusMessage.type)}>
+          {statusMessage.message}
+        </div>
+      )}
+      
       <div className="server-status">
         <div>
           <span>Status: </span>
-          <span className={`status-indicator ${isRunning ? 'active' : 'inactive'}`}>
-            {isRunning ? 'Running' : 'Stopped'}
+          <span className={`status-indicator ${displayIsRunning ? 'active' : 'inactive'}`}>
+            {displayIsRunning ? 'Running' : 'Stopped'}
           </span>
         </div>
         
-        {isRunning ? (
+        {displayIsRunning ? (
           <button 
             className="control-button stop"
             onClick={handleStopServer}
@@ -110,7 +253,7 @@ export function ServerControlPanel({ isRunning, port }) {
         )}
       </div>
       
-      {isRunning && (
+      {displayIsRunning && (
         <div className="server-info">
           <p>Server is running on port {port}</p>
           <p>Share your IP address with others to receive files</p>
@@ -126,7 +269,7 @@ export function ServerControlPanel({ isRunning, port }) {
           name="port"
           value={config.port}
           onChange={handleChange}
-          disabled={isRunning}
+          disabled={displayIsRunning}
         />
       </div>
       
@@ -139,7 +282,7 @@ export function ServerControlPanel({ isRunning, port }) {
           value={config.downloadsDirectory}
           onChange={handleChange}
           placeholder="Default: ./downloads (in application directory)"
-          disabled={isRunning}
+          disabled={displayIsRunning}
         />
       </div>
       
@@ -151,7 +294,7 @@ export function ServerControlPanel({ isRunning, port }) {
             name="useEncryption"
             checked={config.useEncryption}
             onChange={handleChange}
-            disabled={isRunning}
+            disabled={displayIsRunning}
           />
           <label htmlFor="useEncryption">Require Encryption</label>
         </div>
@@ -166,7 +309,7 @@ export function ServerControlPanel({ isRunning, port }) {
             name="password"
             value={config.password}
             onChange={handleChange}
-            disabled={isRunning}
+            disabled={displayIsRunning}
           />
         </div>
       )}
@@ -174,7 +317,7 @@ export function ServerControlPanel({ isRunning, port }) {
       <button 
         className="save-button"
         onClick={handleSaveConfig}
-        disabled={isRunning}
+        disabled={displayIsRunning}
       >
         Save Configuration
       </button>

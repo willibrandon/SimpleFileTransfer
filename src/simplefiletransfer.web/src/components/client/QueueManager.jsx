@@ -2,11 +2,19 @@ import { useState, useEffect } from 'react';
 import { clientApi } from '../../api/apiService';
 import { useWebSocket } from '../../WebSocketContext'
 
-export function QueueManager({ isProcessing, count }) {
+export function QueueManager({ isProcessing: initialIsProcessing, count, onProcessingChange }) {
   const { connected } = useWebSocket()
   const [queue, setQueue] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isProcessing, setIsProcessing] = useState(initialIsProcessing);
+
+  // Update parent component when processing state changes
+  useEffect(() => {
+    if (onProcessingChange && isProcessing !== initialIsProcessing) {
+      onProcessingChange(isProcessing);
+    }
+  }, [isProcessing, initialIsProcessing, onProcessingChange]);
 
   // Fetch queue status on component mount
   useEffect(() => {

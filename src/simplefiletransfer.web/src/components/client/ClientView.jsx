@@ -6,6 +6,12 @@ import { useWebSocket } from '../../WebSocketContext'
 
 export function ClientView() {
   const { transferHistory, queueStatus } = useWebSocket()
+  const [isProcessing, setIsProcessing] = useState(queueStatus.isProcessing)
+  
+  // Handle processing state changes from QueueManager
+  const handleProcessingChange = (newState) => {
+    setIsProcessing(newState);
+  };
   
   return (
     <div className="client-view">
@@ -20,6 +26,7 @@ export function ClientView() {
           <QueueManager 
             isProcessing={queueStatus.isProcessing}
             count={queueStatus.count}
+            onProcessingChange={handleProcessingChange}
           />
         </div>
         <div className="client-history">

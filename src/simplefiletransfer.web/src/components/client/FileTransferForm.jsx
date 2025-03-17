@@ -222,7 +222,7 @@ export function FileTransferForm() {
         <button
           type="submit"
           className="transfer-button"
-          disabled={isSubmitting || !connected}
+          disabled={isSubmitting || !formData.host || !formData.file || (formData.useEncryption && !formData.password)}
         >
           {isSubmitting ? 'Processing...' : formData.addToQueue ? 'Add to Queue' : 'Transfer Now'}
         </button>

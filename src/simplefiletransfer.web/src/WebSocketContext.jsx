@@ -1,10 +1,16 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 
 // Create a context for the WebSocket
 const WebSocketContext = createContext(null);
 
 // Custom hook to use the WebSocket context
 export const useWebSocket = () => useContext(WebSocketContext);
+
+// Silent logger function that does nothing in production
+const logger = {
+  log: process.env.NODE_ENV === 'development' ? console.log : () => {},
+  error: process.env.NODE_ENV === 'development' ? console.error : () => {}
+};
 
 // WebSocket provider component
 export function WebSocketProvider({ children }) {
@@ -15,9 +21,23 @@ export function WebSocketProvider({ children }) {
   const [receivedFiles, setReceivedFiles] = useState([]);
   const [transferHistory, setTransferHistory] = useState([]);
   const [queueStatus, setQueueStatus] = useState({ isProcessing: false, count: 0 });
+  
+  // Refs for reconnection logic
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = useRef(10);
+  const reconnectTimeoutId = useRef(null);
+  const isUnmounting = useRef(false);
 
-  // Connect to the WebSocket server
-  useEffect(() => {
+  // Function to create a new WebSocket connection
+  const createWebSocketConnection = () => {
+    if (isUnmounting.current) return;
+    
+    // Clear any existing reconnection timeout
+    if (reconnectTimeoutId.current) {
+      clearTimeout(reconnectTimeoutId.current);
+      reconnectTimeoutId.current = null;
+    }
+    
     // Determine the WebSocket URL based on the current location
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -27,28 +47,40 @@ export function WebSocketProvider({ children }) {
     
     // Set up event handlers
     newSocket.onopen = () => {
-      console.log('WebSocket connected');
+      // Reset reconnection attempts on successful connection
+      reconnectAttempts.current = 0;
       setConnected(true);
+      logger.log('WebSocket connected');
     };
     
-    newSocket.onclose = () => {
-      console.log('WebSocket disconnected');
+    newSocket.onclose = (event) => {
       setConnected(false);
       
-      // Try to reconnect after a delay
-      setTimeout(() => {
-        setSocket(null);
-      }, 5000);
+      // Don't log normal closures
+      if (event.code !== 1000) {
+        logger.log('WebSocket disconnected, will attempt to reconnect...');
+      }
+      
+      // Attempt to reconnect with exponential backoff
+      if (!isUnmounting.current && reconnectAttempts.current < maxReconnectAttempts.current) {
+        const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts.current), 30000);
+        reconnectAttempts.current++;
+        
+        reconnectTimeoutId.current = setTimeout(() => {
+          createWebSocketConnection();
+        }, delay);
+      }
     };
     
-    newSocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    newSocket.onerror = () => {
+      // Suppress error logging - we'll handle reconnection in onclose
+      // Errors are expected during development or when the server is starting up
     };
     
     newSocket.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data);
-        console.log('WebSocket event:', event);
+        logger.log('WebSocket event:', event);
         
         // Add the event to the events list
         setEvents(prev => [...prev, event]);
@@ -56,17 +88,30 @@ export function WebSocketProvider({ children }) {
         // Handle specific event types
         handleEvent(event);
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        logger.error('Error parsing WebSocket message:', error);
       }
     };
     
     // Save the socket to state
     setSocket(newSocket);
+  };
+
+  // Connect to the WebSocket server
+  useEffect(() => {
+    isUnmounting.current = false;
+    createWebSocketConnection();
     
     // Clean up on unmount
     return () => {
-      if (newSocket) {
-        newSocket.close();
+      isUnmounting.current = true;
+      
+      if (reconnectTimeoutId.current) {
+        clearTimeout(reconnectTimeoutId.current);
+      }
+      
+      if (socket) {
+        // Use a clean close code to prevent reconnection attempts
+        socket.close(1000, "Component unmounting");
       }
     };
   }, []);
@@ -86,8 +131,33 @@ export function WebSocketProvider({ children }) {
         setServerStatus({ isRunning: false, port: 0 });
         break;
         
+      case 'received_files':
+        // Handle initial list of received files
+        if (Array.isArray(event.data)) {
+          // Use the server's file IDs directly
+          const formattedFiles = event.data.map(file => ({
+            id: file.id,
+            fileName: file.fileName || 'Unknown',
+            size: file.size || 0,
+            sender: file.sender || 'Unknown',
+            receivedDate: file.receivedDate || new Date().toISOString(),
+            directory: file.directory || null
+          }));
+          setReceivedFiles(formattedFiles);
+        }
+        break;
+        
       case 'file_received':
-        setReceivedFiles(prev => [...prev, event.data]);
+        // Use the server's file ID directly
+        const fileData = {
+          id: event.data.id,
+          fileName: event.data.fileName || 'Unknown',
+          size: event.data.size || 0,
+          sender: event.data.sender || 'Unknown',
+          receivedDate: event.data.receivedDate || new Date().toISOString(),
+          directory: event.data.directory || null
+        };
+        setReceivedFiles(prev => [...prev, fileData]);
         break;
         
       case 'transfer_started':
@@ -154,7 +224,7 @@ export function WebSocketProvider({ children }) {
     if (socket && connected) {
       socket.send(JSON.stringify(message));
     } else {
-      console.error('Cannot send message: WebSocket not connected');
+      logger.error('Cannot send message: WebSocket not connected');
     }
   };
   

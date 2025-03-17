@@ -222,6 +222,29 @@ public class ServerController : ControllerBase
         return Ok(new { files = _receivedFiles });
     }
 
+    /// <summary>
+    /// Downloads a file by its ID.
+    /// </summary>
+    /// <param name="id">The ID of the file to download.</param>
+    /// <returns>The file as a download.</returns>
+    [HttpGet("files/{id}/download")]
+    public IActionResult DownloadFile(string id)
+    {
+        var file = _receivedFiles.FirstOrDefault(f => f.Id == id);
+        
+        if (file == null)
+        {
+            return NotFound(new { error = $"File with ID {id} not found" });
+        }
+        
+        if (!System.IO.File.Exists(file.FilePath))
+        {
+            return NotFound(new { error = $"File {file.FileName} no longer exists on disk" });
+        }
+        
+        return PhysicalFile(file.FilePath, "application/octet-stream", file.FileName);
+    }
+
     private static async void OnFileReceived(object? sender, FileReceivedEventArgs e)
     {
         try
